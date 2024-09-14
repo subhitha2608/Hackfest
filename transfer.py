@@ -1,37 +1,36 @@
 
 from config import engine
-from sqlalchemy import text
 import pandas as pd
-import psycopg2
+from sqlalchemy import text
 
-def transfer_amount(p_sender, p_receiver, p_amount):
+def transfer_funds(p_sender, p_receiver, p_amount):
+    # Create a connection object
+    conn = engine.connect()
+
     try:
         # Subtract the amount from the sender's account
-        update_sender = text("""UPDATE accounts
-                                SET balance = balance - :p_amount
-                                WHERE id = :p_sender""")
-        result_sender = engine.execute(update_sender, p_sender=p_sender, p_amount=p_amount)
-        conn = engine.connect()
-        conn.commit()
+        update_sender_query = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender")
+        conn.execute(update_sender_query, {'amount': p_amount, 'sender': p_sender})
 
         # Add the amount to the receiver's account
-        update_receiver = text("""UPDATE accounts
-                                 SET balance = balance + :p_amount
-                                 WHERE id = :p_receiver""")
-        result_receiver = engine.execute(update_receiver, p_receiver=p_receiver, p_amount=p_amount)
+        update_receiver_query = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver")
+        conn.execute(update_receiver_query, {'amount': p_amount, 'receiver': p_receiver})
+
+        # Commit the changes
         conn.commit()
 
-        # Get the updated balances
-        get_balances = text("SELECT * FROM accounts")
-        result_balances = engine.execute(get_balances).fetchall()
+        # Return the updated balances
+        query = text("SELECT balance FROM accounts WHERE id IN (:sender, :receiver)")
+        result = conn.execute(query, {'sender': p_sender, 'receiver': p_receiver})
+        balances = [dict(row) for row in result]
 
-        df_balances = pd.DataFrame(result_balances, columns=['id', 'balance'])
-        df_balances = df_balances.sort_values(by='id')
-
-        return result_balances
+        return balances
 
     except Exception as e:
-        print(f"Error: {e}")
-        return None
+        # Rollback the changes if an error occurs
+        conn.rollback()
+        raise e
 
-transfer_amount(sender, receiver, amount)
+    finally:
+        # Close the connection
+        conn.close()

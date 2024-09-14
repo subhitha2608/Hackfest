@@ -1,65 +1,136 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from your_module import calculate_repayment_schedule
+from your_module import generate_repayment_schedule  # Replace 'your_module' with the actual module name
+import pandas as pd
+from datetime import datetime, timedelta
+import psycopg2
+from sqlalchemy import text, create_engine
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
-    @patch('your_module.engine')
-    @patch('your_module.text')
-    def test_calculate_repayment_schedule(self, mock_text, mock_engine):
-        # Mock the database query to return a loan record with a valid loan id
-        loan_id = 123
-        result = {'loanamount': 10000, 'interestrate': 5, 'loanterm': 360, 'startdate': '2022-01-01'}
-        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
-        mock_engine.execute.return_value = Mock(fetchone= lambda: result)
+class TestGenerateRepaymentSchedule(unittest.TestCase):
 
-        # Call the function
-        repayment_schedule = calculate_repayment_schedule(loan_id)
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine('postgresql://user:password@host:port/dbname')  # Replace with your DB credentials
+        cls.conn = cls.engine.raw_connection()
 
-        # Verify the function execution
-        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
-        self.assertEqual(len(repayment_schedule), result['loanterm'])
+    def test_generate_repayment_schedule(self):
+        loan_id = 1
+        loan_amount = 10000
+        interest_rate = 6
+        loan_term = 12
+        start_date = datetime(2022, 1, 1)
 
-        # Verify each payment in the schedule
-        for payment in repayment_schedule:
-            self.assertIn('paymentnumber', payment)
-            self.assertIn('paymentdate', payment)
-            self.assertIn('principalamount', payment)
-            self.assertIn('interestamount', payment)
-            self.assertIn('totalpayment', payment)
-            self.assertIn('balance', payment)
+        # Create a test loan
+        query = text("""
+            INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate)
+            VALUES (:loan_id, :loan_amount, :interest_rate, :loan_term, :start_date)
+            RETURNING loanid
+        """)
+        result = self.engine.execute(query, {
+            'loan_id': loan_id,
+            'loan_amount': loan_amount,
+            'interest_rate': interest_rate,
+            'loan_term': loan_term,
+            'start_date': start_date
+        })
+        result.fetchall()
 
-    @patch('your_module.engine')
-    @patch('your_module.text')
-    def test_calculate_repayment_schedule_invalid_loan_id(self, mock_text, mock_engine):
-        # Mock the database query to return a loan record with an invalid loan id
-        loan_id = 99999
-        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
-        mock_engine.execute.return_value = Mock(fetchone= lambda: None)
+        generate_repayment_schedule(loan_id)
 
-        # Call the function
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
+        # Check repayment schedule
+        query = text("""
+            SELECT COUNT(*) 
+            FROM repaymentschedule 
+            WHERE loanid = :loan_id
+        """)
+        result = self.engine.execute(query, {'loan_id': loan_id})
+        count, = result.fetchone()
+        self.assertEqual(count, loan_term)
 
-        # Verify the function execution
-        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
-        self.assertIsNone(repayment_schedule)
+    def test_generate_repayment_schedule_zero_interest_rate(self):
+        loan_id = 2
+        loan_amount = 10000
+        interest_rate = 0
+        loan_term = 12
+        start_date = datetime(2022, 1, 1)
 
-    @patch('your_module.engine')
-    @patch('your_module.text')
-    def test_calculate_repayment_schedule_zero_loan_term(self, mock_text, mock_engine):
-        # Mock the database query to return a loan record with a zero loan term
-        loan_id = 123
-        result = {'loanamount': 10000, 'interestrate': 5, 'loanterm': 0, 'startdate': '2022-01-01'}
-        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
-        mock_engine.execute.return_value = Mock(fetchone= lambda: result)
+        # Create a test loan
+        query = text("""
+            INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate)
+            VALUES (:loan_id, :loan_amount, :interest_rate, :loan_term, :start_date)
+            RETURNING loanid
+        """)
+        result = self.engine.execute(query, {
+            'loan_id': loan_id,
+            'loan_amount': loan_amount,
+            'interest_rate': interest_rate,
+            'loan_term': loan_term,
+            'start_date': start_date
+        })
+        result.fetchall()
 
-        # Call the function
-        repayment_schedule = calculate_repayment_schedule(loan_id)
+        generate_repayment_schedule(loan_id)
 
-        # Verify the function execution
-        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
-        self.assertEqual(len(repayment_schedule), 0)
+        # Check repayment schedule
+        query = text("""
+            SELECT COUNT(*) 
+            FROM repaymentschedule 
+            WHERE loanid = :loan_id
+        """)
+        result = self.engine.execute(query, {'loan_id': loan_id})
+        count, = result.fetchone()
+        self.assertEqual(count, loan_term)
+
+    def test_generate_repayment_schedule_one_month_loan_term(self):
+        loan_id = 3
+        loan_amount = 10000
+        interest_rate = 6
+        loan_term = 1
+        start_date = datetime(2022, 1, 1)
+
+        # Create a test loan
+        query = text("""
+            INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate)
+            VALUES (:loan_id, :loan_amount, :interest_rate, :loan_term, :start_date)
+            RETURNING loanid
+        """)
+        result = self.engine.execute(query, {
+            'loan_id': loan_id,
+            'loan_amount': loan_amount,
+            'interest_rate': interest_rate,
+            'loan_term': loan_term,
+            'start_date': start_date
+        })
+        result.fetchall()
+
+        generate_repayment_schedule(loan_id)
+
+        # Check repayment schedule
+        query = text("""
+            SELECT COUNT(*) 
+            FROM repaymentschedule 
+            WHERE loanid = :loan_id
+        """)
+        result = self.engine.execute(query, {'loan_id': loan_id})
+        count, = result.fetchone()
+        self.assertEqual(count, loan_term)
+
+    def test_generate_repayment_schedule_invalid_loan_id(self):
+        loan_id = 999  # Non-existent loan ID
+        with self.assertRaises(Exception):
+            generate_repayment_schedule(loan_id)
+
+    def tearDown(self):
+        # Clean up test data
+        query = text("""
+            DELETE FROM repaymentschedule WHERE loanid IN (1, 2, 3)
+        """)
+        self.engine.execute(query)
+        query = text("""
+            DELETE FROM loans WHERE loanid IN (1, 2, 3)
+        """)
+        self.engine.execute(query)
+        self.conn.commit()
 
 if __name__ == '__main__':
     unittest.main()

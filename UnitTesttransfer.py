@@ -1,70 +1,64 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from your_module import transfer_amount  # Replace 'your_module' with the actual module name
+from unittest.mock import patch, MagicMock
+from your_module import transfer_funds
 
-class TestTransferAmount(unittest.TestCase):
+class TestTransferFunds(unittest.TestCase):
+    @patch('your_module.engine')
+    def test_transfer_funds_success(self, mock_engine):
+        mock_engine.connect = MagicMock(return_value=MagicMock(spec=['execute', 'commit', 'rollback', 'close']))
+        mock_connection = mock_engine.connect.return_value
+        mock_connection.execute.side_effect = [[{'balance': 100}], [{'balance': 200}]]
 
-    def setUp(self):
-        self.p_sender = 1
-        self.p_receiver = 2
-        self.p_amount = 100
+        result = transfer_funds(1, 2, 50)
+        self.assertEqual(result, [{'balance': 50}, {'balance': 250}])
+
+        mock_engine.connect.assert_called_once()
+        mock_connection.execute.assert_any_call(text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender"), {'amount': 50, 'sender': 1})
+        mock_connection.execute.assert_any_call(text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver"), {'amount': 50, 'receiver': 2})
+        mock_connection.commit.assert_called_once()
+        mock_connection.close.assert_called_once()
 
     @patch('your_module.engine')
-    @patch('your_module.sqlalchemy')
-    @patch('your_module.conn')
-    @patch('your_module.conn.commit')
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_success(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
-        result_sender = Mock()
-        result_receiver = Mock()
-        result_balances = Mock()
-        mock_sqlalchemy.text.return_value = Mock()
-        mock_sqlalchemy.text.return_value = Mock()
-        mock_engine.execute.return_value = result_sender
-        mock_engine.connect.return_value = conn = Mock()
-        conn.commit.return_value = None
-        result_balances = [(1, 100), (2, 200)]
-        mock_engine.execute.return_value = result_balances
+    def test_transfer_funds_insufficient_funds(self, mock_engine):
+        mock_engine.connect = MagicMock(return_value=MagicMock(spec=['execute', 'commit', 'rollback', 'close']))
+        mock_connection = mock_engine.connect.return_value
+        mock_connection.execute.side_effect = [[{'balance': 10}], [{'balance': 200}]]
 
-        self.assertEqual(transfer_amount(self.p_sender, self.p_receiver, self.p_amount), result_balances)
+        with self.assertRaises(Exception):
+            transfer_funds(1, 2, 50)
+
+        mock_engine.connect.assert_called_once()
+        mock_connection.execute.assert_any_call(text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender"), {'amount': 50, 'sender': 1})
+        mock_connection.rollback.assert_called_once()
+        mock_connection.close.assert_called_once()
 
     @patch('your_module.engine')
-    @patch('your_module.sqlalchemy')
-    @patch('your_module.conn')
-    @patch('your_module.conn.commit')
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_sender_does_not_exist(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
-        mock_engine.execute.side_effect = Exception("Error")
-        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
+    def test_transfer_funds_receiver_not_found(self, mock_engine):
+        mock_engine.connect = MagicMock(return_value=MagicMock(spec=['execute', 'commit', 'rollback', 'close']))
+        mock_connection = mock_engine.connect.return_value
+        mock_connection.execute.side_effect = [[{'balance': 100}], []]
+
+        with self.assertRaises(Exception):
+            transfer_funds(1, 2, 50)
+
+        mock_engine.connect.assert_called_once()
+        mock_connection.execute.assert_any_call(text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender"), {'amount': 50, 'sender': 1})
+        mock_connection.rollback.assert_called_once()
+        mock_connection.close.assert_called_once()
 
     @patch('your_module.engine')
-    @patch('your_module.sqlalchemy')
-    @patch('your_module.conn')
-    @patch('your_module.conn.commit')
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_receiver_does_not_exist(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
-        mock_engine.execute.side_effect = Exception("Error")
-        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
+    def test_transfer_funds_sender_not_found(self, mock_engine):
+        mock_engine.connect = MagicMock(return_value=MagicMock(spec=['execute', 'commit', 'rollback', 'close']))
+        mock_connection = mock_engine.connect.return_value
+        mock_connection.execute.side_effect = [[], [{'balance': 200}]]
 
-    @patch('your_module.engine')
-    @patch('your_module.sqlalchemy')
-    @patch('your_module.conn')
-    @patch('your_module.conn.commit')
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_invalid_amount(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
-        self.p_amount = "Invalid amount"
-        mock_engine.execute.side_effect = Exception("Error")
-        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
+        with self.assertRaises(Exception):
+            transfer_funds(1, 2, 50)
 
-    @patch('your_module.engine')
-    @patch('your_module.sqlalchemy')
-    @patch('your_module.conn')
-    @patch('your_module.conn.commit')
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_error_in_query(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
-        mock_engine.execute.side_effect = Exception("Error")
-        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
+        mock_engine.connect.assert_called_once()
+        mock_connection.rollback.assert_called_once()
+        mock_connection.close.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

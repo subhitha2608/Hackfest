@@ -1,62 +1,73 @@
 
 import unittest
-from your_module import calculate_credit_score
+from unittest.mock import patch, Mock
+from your_module import calculate_credit_score  # replace with the actual module name
 
 class TestCalculateCreditScore(unittest.TestCase):
+    @patch('your_module.engine')
+    def test_calculate_credit_score(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_conn.execute.return_value = Mock(fetchone=Mock(return_value=(1000, 800, 200)))
+        mock_conn.execute.side_effect = [
+            Mock(fetchone=Mock(return_value=(1000, 800, 200))),
+            Mock(fetchone=Mock(return_value=(500,))),
+            Mock(fetchone=Mock(return_value=(2,))),
+        ]
 
-    def setUp(self):
-        self.test_customer_id = 12345
+        result = calculate_credit_score(1)
+        self.assertEqual(result, 740)
 
-    def test_step_1(self):
-        query = text("""
-            SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
-            FROM loans
-            WHERE loans.customer_id = :p_customer_id
-        """)
-        result = result = {'SUM(loan_amount)': 1000.0, 'SUM(repayment_amount)': 800.0, 'SUM(outstanding_balance)': 200.0}
-        self.assertEqual(calculate_credit_score(self.test_customer_id), result)
+    @patch('your_module.engine')
+    def test_calculate_credit_score_no_loans(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_conn.execute.return_value = Mock(fetchone=Mock(return_value=(0, 0, 0)))
+        mock_conn.execute.side_effect = [
+            Mock(fetchone=Mock(return_value=(0, 0, 0))),
+            Mock(fetchone=Mock(return_value=(500,))),
+            Mock(fetchone=Mock(return_value=(0,))),
+        ]
 
-    def test_step_2(self):
-        query = """
-            SELECT COALESCE(ROUND(SUM(balance), 2), 0)
-            FROM credit_cards
-            WHERE credit_cards.customer_id = :p_customer_id
-        """
-        result = {'SUM(balance)': 500.0}
-        self.assertEqual(calculate_credit_score(self.test_customer_id), result)
+        result = calculate_credit_score(1)
+        self.assertEqual(result, 700)
 
-    def test_step_3(self):
-        query = """
-            SELECT COUNT(*)
-            FROM payments
-            WHERE payments.customer_id = :p_customer_id AND status = 'Late'
-        """
-        result = {'COUNT(*)': 1}
-        self.assertEqual(calculate_credit_score(self.test_customer_id), result)
+    @patch('your_module.engine')
+    def test_calculate_credit_score_no_credit_card(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_conn.execute.return_value = Mock(fetchone=Mock(return_value=(1000, 800, 200)))
+        mock_conn.execute.side_effect = [
+            Mock(fetchone=Mock(return_value=(1000, 800, 200))),
+            Mock(fetchone=Mock(return_value=(None,))),
+            Mock(fetchone=Mock(return_value=(2,))),
+        ]
 
-    def test_step_4(self):
-        v_credit_score = calculate_credit_score(self.test_customer_id)
-        self.assertGreaterEqual(v_credit_score, 300)
-        self.assertLessEqual(v_credit_score, 850)
+        result = calculate_credit_score(1)
+        self.assertEqual(result, 740)
 
-    def test_update_customer(self):
-        v_credit_score = calculate_credit_score(self.test_customer_id)
-        query = text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """)
-        self.assertEqual(calculate_credit_score(self.test_customer_id), v_credit_score)
+    @patch('your_module.engine')
+    def test_calculate_credit_score_late_payments(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_conn.execute.return_value = Mock(fetchone=Mock(return_value=(1000, 800, 200)))
+        mock_conn.execute.side_effect = [
+            Mock(fetchone=Mock(return_value=(1000, 800, 200))),
+            Mock(fetchone=Mock(return_value=(500,))),
+            Mock(fetchone=Mock(return_value=(5,))),
+        ]
 
-    def test_log_low_score(self):
-        v_credit_score = 400
-        query = text("""
-            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
-        """)
-        self.assertEqual(calculate_credit_score(self.test_customer_id), v_credit_score)
+        result = calculate_credit_score(1)
+        self.assertEqual(result, 590)
+
+    @patch('your_module.engine')
+    def test_calculate_credit_score_db_error(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_conn.execute.side_effect = psycopg2.Error('Test error')
+
+        result = calculate_credit_score(1)
+        self.assertIsNone(result)
 
 if __name__ == '__main__':
     unittest.main()
