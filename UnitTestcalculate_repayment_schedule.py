@@ -1,69 +1,78 @@
 
 import unittest
-from your_module import calculate_repayment_schedule
+from your_module import generate_repayment_schedule  # Replace with the actual module name
 import pandas as pd
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestGenerateRepaymentSchedule(unittest.TestCase):
     def setUp(self):
-        # Create a test database connection
-        self.conn = engine.connect()
+        # Create a test engine and database connection
+        self.engine = create_engine('postgresql://user:password@host:port/dbname')
+        self.conn = self.engine.connect()
 
         # Create test data in the loans table
-        query = text("""
+        self.loan_id = 1
+        self.loan_amount = 10000
+        self.interest_rate = 5
+        self.loan_term = 60
+        self.start_date = pd.Timestamp('2022-01-01')
+        self.conn.execute("""
             INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate)
-            VALUES (1, 10000, 6, 60, '2022-01-01')
-        """)
-        self.conn.execute(query)
-        self.conn.commit()
+            VALUES (%s, %s, %s, %s, %s)
+        """, (self.loan_id, self.loan_amount, self.interest_rate, self.loan_term, self.start_date))
 
     def tearDown(self):
         # Clean up test data
-        query = text("DELETE FROM loans WHERE loanid = 1")
-        self.conn.execute(query)
-        self.conn.commit()
+        self.conn.execute("DELETE FROM loans WHERE loanid = %s", (self.loan_id,))
         self.conn.close()
 
-    def test_calculate_repayment_schedule_valid_loan_id(self):
-        loan_id = 1
-        repayment_schedule = calculate_repayment_schedule(loan_id)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self.assertEqual(repayment_schedule.shape[0], 60)  # 60 months
-        self.assertEqual(repayment_schedule['loanid'].iloc[0], loan_id)
+    def test_generate_repayment_schedule_valid_loan_id(self):
+        # Test with a valid loan ID
+        generate_repayment_schedule(self.loan_id)
+        # Check that the repayment schedule was generated correctly
+        self.conn.execute("SELECT COUNT(*) FROM repaymentschedule WHERE loanid = %s", (self.loan_id,))
+        count = self.conn.fetchone()[0]
+        self.assertEqual(count, self.loan_term)
 
-    def test_calculate_repayment_schedule_invalid_loan_id(self):
-        loan_id = 2  # non-existent loan ID
-        with self.assertRaises(Exception):
-            calculate_repayment_schedule(loan_id)
+    def test_generate_repayment_schedule_invalid_loan_id(self):
+        # Test with an invalid loan ID
+        with self.assertRaises(psycopg2.Error):
+            generate_repayment_schedule(999)
 
-    def test_calculate_repayment_schedule_zero_loan_amount(self):
-        # Update test data with zero loan amount
-        query = text("UPDATE loans SET loanamount = 0 WHERE loanid = 1")
-        self.conn.execute(query)
-        self.conn.commit()
-
-        loan_id = 1
+    def test_generate_repayment_schedule_zero_loan_amount(self):
+        # Test with a loan amount of 0
+        self.conn.execute("UPDATE loans SET loanamount = 0 WHERE loanid = %s", (self.loan_id,))
         with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(loan_id)
+            generate_repayment_schedule(self.loan_id)
 
-    def test_calculate_repayment_schedule_null_interest_rate(self):
-        # Update test data with null interest rate
-        query = text("UPDATE loans SET interestrate = NULL WHERE loanid = 1")
-        self.conn.execute(query)
-        self.conn.commit()
-
-        loan_id = 1
-        with self.assertRaises(TypeError):
-            calculate_repayment_schedule(loan_id)
-
-    def test_calculate_repayment_schedule_negative_loan_term(self):
-        # Update test data with negative loan term
-        query = text("UPDATE loans SET loanterm = -1 WHERE loanid = 1")
-        self.conn.execute(query)
-        self.conn.commit()
-
-        loan_id = 1
+    def test_generate_repayment_schedule_negative_loan_amount(self):
+        # Test with a negative loan amount
+        self.conn.execute("UPDATE loans SET loanamount = -1000 WHERE loanid = %s", (self.loan_id,))
         with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
+            generate_repayment_schedule(self.loan_id)
+
+    def test_generate_repayment_schedule_zero_interest_rate(self):
+        # Test with an interest rate of 0
+        self.conn.execute("UPDATE loans SET interestrate = 0 WHERE loanid = %s", (self.loan_id,))
+        with self.assertRaises(ZeroDivisionError):
+            generate_repayment_schedule(self.loan_id)
+
+    def test_generate_repayment_schedule_negative_interest_rate(self):
+        # Test with a negative interest rate
+        self.conn.execute("UPDATE loans SET interestrate = -5 WHERE loanid = %s", (self.loan_id,))
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(self.loan_id)
+
+    def test_generate_repayment_schedule_zero_loan_term(self):
+        # Test with a loan term of 0
+        self.conn.execute("UPDATE loans SET loanterm = 0 WHERE loanid = %s", (self.loan_id,))
+        with self.assertRaises(ZeroDivisionError):
+            generate_repayment_schedule(self.loan_id)
+
+    def test_generate_repayment_schedule_negative_loan_term(self):
+        # Test with a negative loan term
+        self.conn.execute("UPDATE loans SET loanterm = -60 WHERE loanid = %s", (self.loan_id,))
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(self.loan_id)
 
 if __name__ == '__main__':
     unittest.main()
