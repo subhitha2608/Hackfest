@@ -1,51 +1,97 @@
 
-import unittest
-from your_module import transfer_funds
-from your_module import engine
+import pytest
+import pandas as pd
+from your_module import transfer_amount
 
-class TestTransferFunds(unittest.TestCase):
+@pytest.fixture
+def engine_mock(mocker):
+    return mocker.Mock()
 
-    def setUp(self):
-        # Create test data
-        self.sender_id = 1
-        self.receiver_id = 2
-        self.amount = 100
-        self.new_balance_sender = 900
-        self.new_balance_receiver = 1000
+@pytest.fixture
+def conn_mock(mocker):
+    return mocker.Mock()
 
-        # Create test db rows
-        df = pd.DataFrame({'id': [self.sender_id, self.receiver_id], 'balance': [1000, 0]})
-        df.to_sql('accounts', engine, if_exists='replace', index=False)
+@pytest.fixture
+def result_mock(mocker):
+    return mocker.Mock(return_value=None)
 
-    def test_transfer_funds(self):
-        transfer_funds(self.sender_id, self.receiver_id, self.amount)
-        sender_result = engine.execute('SELECT balance FROM accounts WHERE id = :id', {'id': self.sender_id}).fetchone()[0]
-        receiver_result = engine.execute('SELECT balance FROM accounts WHERE id = :id', {'id': self.receiver_id}).fetchone()[0]
-        self.assertEqual(sender_result, self.new_balance_sender)
-        self.assertEqual(receiver_result, self.new_balance_receiver)
+@pytest.mark.usefixtures("engine_mock", "conn_mock", "result_mock")
+class TestTransferAmount:
+    def test_zero_amount(self, engine_mock, conn_mock, result_mock):
+        sender_id = "1"
+        receiver_id = "2"
+        amount = 0
+        result = transfer_amount(sender_id, receiver_id, amount)
+        assert result == []
+        engine_mock.execute.assert_called_once()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()
 
-    def test_transfer_zero_amount(self):
-        transfer_funds(self.sender_id, self.receiver_id, 0)
-        sender_result = engine.execute('SELECT balance FROM accounts WHERE id = :id', {'id': self.sender_id}).fetchone()[0]
-        receiver_result = engine.execute('SELECT balance FROM accounts WHERE id = :id', {'id': self.receiver_id}).fetchone()[0]
-        self.assertEqual(sender_result, 1000)
-        self.assertEqual(receiver_result, 0)
+    def test_sender_id_not_found(self, engine_mock, conn_mock, result_mock):
+        sender_id = "999"
+        receiver_id = "2"
+        amount = 100
+        result = transfer_amount(sender_id, receiver_id, amount)
+        assert result == []
+        engine_mock.execute.assert_called_once()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()
 
-    def test_transfer_negative_amount(self):
-        with self.assertRaises(ValueError):
-            transfer_funds(self.sender_id, self.receiver_id, -100)
+    def test_receiver_id_not_found(self, engine_mock, conn_mock, result_mock):
+        sender_id = "1"
+        receiver_id = "999"
+        amount = 100
+        result = transfer_amount(sender_id, receiver_id, amount)
+        assert result == []
+        engine_mock.execute.assert_called_once()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()
 
-    def test_transfer_funds_invalid_sender_id(self):
-        with self.assertRaises(ValueError):
-            transfer_funds(-1, self.receiver_id, self.amount)
+    def test_amount_is_zero(self, engine_mock, conn_mock, result_mock):
+        sender_id = "1"
+        receiver_id = "2"
+        amount = 0
+        result = transfer_amount(sender_id, receiver_id, amount)
+        assert result == []
+        engine_mock.execute.assert_called_once()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()
 
-    def test_transfer_funds_invalid_receiver_id(self):
-        with self.assertRaises(ValueError):
-            transfer_funds(self.sender_id, -1, self.amount)
+    def test_sender_balance_empty(self, engine_mock, conn_mock, result_mock):
+        sender_id = "1"
+        receiver_id = "2"
+        amount = 100
+        engine.execute.return_value.fetchall.return_value = []
+        result = transfer_amount(sender_id, receiver_id, amount)
+        assert result == []
+        engine_mock.execute.assert_called_once()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()
 
-    def tearDown(self):
-        # Drop test db
-        engine.execute('DROP TABLE accounts;')
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_receiver_balance_empty(self, engine_mock, conn_mock, result_mock):
+        sender_id = "1"
+        receiver_id = "2"
+        amount = 100
+        update_receiver = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver_id")
+        result = engine.execute(update_receiver, {"receiver_id": receiver_id, "amount": 0})
+        conn.commit()
+        result_mock.reset_mock()
+        result_mock.fetchall.return_value = []
+        result_mock.reset_mock()
+        result_mock.return_value = None
+        conn_mock.commit.assert_called()

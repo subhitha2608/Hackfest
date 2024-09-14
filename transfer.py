@@ -1,26 +1,19 @@
-
+Python
 from config import engine
+from sqlalchemy import text
 import pandas as pd
+import psycopg2
 
-def transfer_funds(sender_id, receiver_id, amount):
+def transfer_amount(sender_id, receiver_id, amount):
     # Subtract the amount from the sender's account
-    update_sender = text("""
-        UPDATE accounts
-        SET balance = balance - :amount
-        WHERE id = :sender_id;
-    """)
-    update_sender_params = {"sender_id": sender_id, "amount": amount}
-    engine.execute(update_sender, **update_sender_params)
-
+    update_sender = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender_id")
+    result = engine.execute(update_sender, {"sender_id": sender_id, "amount": amount})
+    conn = engine.connect()
+    conn.commit()
+    
     # Add the amount to the receiver's account
-    update_receiver = text("""
-        UPDATE accounts
-        SET balance = balance + :amount
-        WHERE id = :receiver_id;
-    """)
-    update_receiver_params = {"receiver_id": receiver_id, "amount": amount}
-    engine.execute(update_receiver, **update_receiver_params)
-
-    # Commit the changes
-    engine.commit()
-    return None
+    update_receiver = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver_id")
+    result = engine.execute(update_receiver, {"receiver_id": receiver_id, "amount": amount})
+    conn.commit()
+    
+    return result.fetchall()
