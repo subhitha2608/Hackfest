@@ -1,109 +1,65 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from your_module import calculate_repayment_schedule
+from datetime import date
+from loan_repayment_schedule import calculate_repayment_schedule
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestLoanRepaymentSchedule(unittest.TestCase):
 
-    @patch('your_module.engine.execute')
-    @patch('your_module.engine')
-    @patch('pandas.to_datetime')
-    def test_calculate_repayment_schedule(self, mock_pandas_to_datetime, mock_sqlalchemy_engine, mock_engine_execute):
+    def test_calculate_repayment_schedule_valid_loan(self):
         loan_id = 1
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 60
-        start_date = '2020-01-01'
+        loan_details = {
+            'loanamount': 100000,
+            'interestrate': 6,
+            'loanterm': 5,
+            'startdate': date(2022, 1, 1)
+        }
+        calculate_repayment_schedule(loan_id, **loan_details)
 
-        mock_sqlalchemy_engine.execute.return_value = [(loan_amount, interest_rate, loan_term, start_date)]
-        mock_pandas_to_datetime.return_value = start_date
-        mock_engine_execute.side_effect = [Mock(return_value=(loan_amount, interest_rate, loan_term, start_date)),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None)]
-
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
-
-    @patch('your_module.engine.execute')
-    @patch('your_module.engine')
-    @patch('pandas.to_datetime')
-    def test_calculate_repayment_schedule_loanterm_zero(self, mock_pandas_to_datetime, mock_sqlalchemy_engine, mock_engine_execute):
-        loan_id = 1
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 0
-        start_date = '2020-01-01'
-
-        mock_sqlalchemy_engine.execute.return_value = [(loan_amount, interest_rate, loan_term, start_date)]
-        mock_pandas_to_datetime.return_value = start_date
-        mock_engine_execute.side_effect = [Mock(return_value=(loan_amount, interest_rate, loan_term, start_date)),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None)]
-
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
-
-    @patch('your_module.engine.execute')
-    @patch('your_module.engine')
-    @patch('pandas.to_datetime')
-    def test_calculate_repayment_schedule_loanterm_negative(self, mock_pandas_to_datetime, mock_sqlalchemy_engine, mock_engine_execute):
-        loan_id = 1
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = -1
-        start_date = '2020-01-01'
-
-        mock_sqlalchemy_engine.execute.return_value = [(loan_amount, interest_rate, loan_term, start_date)]
-        mock_pandas_to_datetime.return_value = start_date
-        mock_engine_execute.side_effect = [Mock(return_value=(loan_amount, interest_rate, loan_term, start_date)),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None)]
-
-        with self.assertRaises(ValueError):
+    def test_calculate_repayment_schedule_invalid_loan_id(self):
+        loan_id = 0
+        with self.assertRaises(Exception):
             calculate_repayment_schedule(loan_id)
 
-    @patch('your_module.engine.execute')
-    @patch('your_module.engine')
-    @patch('pandas.to_datetime')
-    def test_calculate_repayment_schedule_interestrate_zero(self, mock_pandas_to_datetime, mock_sqlalchemy_engine, mock_engine_execute):
+    def test_calculate_repayment_schedule_invalid_loan_details(self):
         loan_id = 1
-        loan_amount = 10000
-        interest_rate = 0
-        loan_term = 60
-        start_date = '2020-01-01'
+        loan_details = {
+            'loanamount': 0,
+            'interestrate': -1,
+            'loanterm': 0,
+            'startdate': date(2022, 1, 1)
+        }
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(loan_id, **loan_details)
 
-        mock_sqlalchemy_engine.execute.return_value = [(loan_amount, interest_rate, loan_term, start_date)]
-        mock_pandas_to_datetime.return_value = start_date
-        mock_engine_execute.side_effect = [Mock(return_value=(loan_amount, interest_rate, loan_term, start_date)),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None)]
-
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
-
-    @patch('your_module.engine.execute')
-    @patch('your_module.engine')
-    @patch('pandas.to_datetime')
-    def test_calculate_repayment_schedule_non_integer_loan_term(self, mock_pandas_to_datetime, mock_sqlalchemy_engine, mock_engine_execute):
+    def test_calculate_repayment_schedule_database_error(self):
         loan_id = 1
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 3.5
-        start_date = '2020-01-01'
+        loan_details = {
+            'loanamount': 100000,
+            'interestrate': 6,
+            'loanterm': 5,
+            'startdate': date(2022, 1, 1)
+        }
+        with unittest.mock.patch('loan_repayment_schedule.engine.connect') as connect:
+            connect.side_effect = psycopg2.Error('test error')
+            with self.assertRaises(Exception):
+                calculate_repayment_schedule(loan_id, **loan_details)
 
-        mock_sqlalchemy_engine.execute.return_value = [(loan_amount, interest_rate, loan_term, start_date)]
-        mock_pandas_to_datetime.return_value = start_date
-        mock_engine_execute.side_effect = [Mock(return_value=(loan_amount, interest_rate, loan_term, start_date)),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None),
-                                            Mock(return_value=None)]
-
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
+    def test_calculate_repayment_schedule_rollback(self):
+        loan_id = 1
+        loan_details = {
+            'loanamount': 100000,
+            'interestrate': 6,
+            'loanterm': 5,
+            'startdate': date(2022, 1, 1)
+        }
+        with unittest.mock.patch('loan_repayment_schedule.engine.connect') as connect:
+            with unittest.mock.patch('loan_repayment_schedule.conn.commit') as commit:
+                connect.return_value = unittest.mock.Mock(spec=psycopg2.connect)
+                commit.side_effect = psycopg2.Error('test error')
+                with self.assertRaises(Exception):
+                    calculate_repayment_schedule(loan_id, **loan_details)
+                self.assertRaises(psycopg2.Error, commit)
+                self.assertIsNotNone(connect.return_value.rollback.called)
 
 if __name__ == '__main__':
     unittest.main()

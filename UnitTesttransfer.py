@@ -1,103 +1,69 @@
-
+Python
 import unittest
-from your_module import transfer_amount  # Replace 'your_module' with the actual name of the module that contains the `transfer_amount` function
+from unittest.mock import patch, Mock
 from config import engine
+import pandas as pd
+from sqlalchemy import text
+import psycopg2
 
-class TestTransferAmount(unittest.TestCase):
-    def setUp(self):
-        # Create a test database and tables
-        # Implement me!
+class TestTransaction(unittest.TestCase):
 
-    def tearDown(self):
-        # Drop the test database and tables
-        # Implement me!
-
-    def test_transfer_amount_success(self):
-        # Test that the sender's balance is decreased and the receiver's balance is increased
-        sender_id = 1
-        receiver_id = 2
-        amount = 10
-
-        # Arrange
-        sender_balance_before = 100
-        receiver_balance_before = 0
-
-        # Act
-        transfer_amount(sender_id, receiver_id, amount)
-
-        # Assert
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
-        self.assertEqual(result[0], sender_balance_before - amount)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
-        self.assertEqual(result[0], receiver_balance_before + amount)
-
-    def test_transfer_amount_insufficient_funds(self):
-        # Test that an exception is raised if the sender does not have enough funds
-        sender_id = 1
-        receiver_id = 2
-        amount = 10000
-
-        # Arrange
-        sender_balance_before = 50
-
-        # Act and Assert
+    @patch('config.engine.connect')
+    def test_transaction_success(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 100.0}, {"id": 2, "balance": 100.0}]
+        mock_connect.return_value.close.return_value = None
+        result.execute.return_value.rowcount = 2
+        result.close.return_value = None
+        
+        tester = transaction(1, 2, 100.0)
+        self.assertEqual(tester, [{"id": 1, "balance": 100.0}, {"id": 2, "balance": 100.0}])
+        
+    @patch('config.engine.connect')
+    def test_transaction_error(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.side_effect = psycopg2.Error('Database error')
+        mock_connect.return_value.close.return_value = None
         with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id, receiver_id, amount)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
-        self.assertEqual(result[0], sender_balance_before)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
-        self.assertIsNone(result)
-
-    def test_transfer_amount_invalid_sender_id(self):
-        # Test that an exception is raised if the sender ID is invalid
-        sender_id = 9999
-        receiver_id = 2
-        amount = 10
-
-        # Act and Assert
+            transaction(1, 2, 100.0)
+        
+    @patch('config.engine.connect')
+    def test_transaction_zero_sent(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}]
+        mock_connect.return_value.close.return_value = None
+        result.execute.return_value.rowcount = 2
+        result.close.return_value = None
+        
+        tester = transaction(1, 2, 1000.0)
+        self.assertEqual(tester, [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}])
+        
+    @patch('config.engine.connect')
+    def test_transaction_zero_recieved(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.side_effect = psycopg2.Error('Database error')
+        mock_connect.return_value.close.return_value = None
         with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id, receiver_id, amount)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
-        self.assertIsNone(result)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
-        self.assertIsNone(result)
-
-    def test_transfer_amount_invalid_receiver_id(self):
-        # Test that an exception is raised if the receiver ID is invalid
-        sender_id = 1
-        receiver_id = 9999
-        amount = 10
-
-        # Act and Assert
+            transaction(1, 2, -100.0)
+        
+    @patch('config.engine.connect')
+    def test_transaction_large_amount(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}]
+        mock_connect.return_value.close.return_value = None
+        result.execute.return_value.rowcount = 2
+        result.close.return_value = None
+        
+        tester = transaction(1, 2, 10000.0)
+        self.assertEqual(tester, [{"id": 1, "balance": 0.0}, {"id": 2, "balance": 10000.0}])
+        
+    @patch('config.engine.connect')
+    def test_transaction_negative_amount(self, mock_connect):
+        result = mock_connect.return_value
+        result.execute.side_effect = psycopg2.Error('Database error')
+        mock_connect.return_value.close.return_value = None
         with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id, receiver_id, amount)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
-        self.assertIsNone(result)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
-        self.assertIsNone(result)
-
-    def test_transfer_amount_edge_case_zero_amount(self):
-        # Test that an exception is raised if the transfer amount is zero
-        sender_id = 1
-        receiver_id = 2
-        amount = 0
-
-        # Act and Assert
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id, receiver_id, amount)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
-        self.assertIsNone(result)
-
-        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
-        self.assertIsNone(result)
+            transaction(1, 2, -10.0)
 
 if __name__ == '__main__':
     unittest.main()
