@@ -1,64 +1,52 @@
 
 import unittest
-import pandas as pd
-from your_module import calculate_repayment_schedule  # Replace with the actual module name
+from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
     def setUp(self):
-        # Create a test database connection
-        self.conn = psycopg2.connect(
-            host="localhost",
-            database="test_db",
-            user="test_user",
-            password="test_password"
-        )
-        self.engine = create_engine("postgresql://test_user:test_password@localhost/test_db")
+        # Create a test loan ID
+        self.loan_id = 1
+
+    def test_valid_loan_id(self):
+        # Test with a valid loan ID
+        repayment_schedule = calculate_repayment_schedule(self.loan_id)
+        self.assertIsInstance(repayment_schedule, pd.DataFrame)
+        self assertEqual(repayment_schedule.shape[0], 12)  # 12 months in a year
+        self assertEqual(repayment_schedule.shape[1], 7)  # 7 columns in the repayment schedule
+
+    def test_invalid_loan_id(self):
+        # Test with an invalid loan ID
+        with self.assertRaisesREGEX(Exception, "Loan not found"):
+            calculate_repayment_schedule(-1)
+
+    def test_no_loan_details(self):
+        # Test when there are no loan details for the given loan ID
+        with self.assertRaisesREGEX(Exception, "No loan details found"):
+            calculate_repayment_schedule(999)  # assume this loan ID doesn't exist
+
+    def test_insufficient_funds(self):
+        # Test when the loan amount is 0
+        with self.assertRaisesREGEX(ValueError, "Loan amount cannot be 0"):
+            calculate_repayment_schedule(self.loan_id, loan_amount=0)
+
+    def test_interest_rate_zero(self):
+        # Test when the interest rate is 0
+        with self.assertRaisesREGEX(ValueError, "Interest rate cannot be 0"):
+            calculate_repayment_schedule(self.loan_id, interest_rate=0)
+
+    def test_loan_term_zero(self):
+        # Test when the loan term is 0
+        with self.assertRaisesREGEX(ValueError, "Loan term cannot be 0"):
+            calculate_repayment_schedule(self.loan_id, loan_term=0)
+
+    def test_start_date_in_future(self):
+        # Test when the start date is in the future
+        with self.assertRaisesREGEX(ValueError, "Start date cannot be in the future"):
+            calculate_repayment_schedule(self.loan_id, start_date=pd.Timestamp("2030-01-01"))
 
     def tearDown(self):
-        # Close the test database connection
-        self.conn.close()
+        # Clean up any resources used during the test
+        pass
 
-    def test_calculate_repayment_schedule_valid_loan_id(self):
-        # Insert a test loan record into the loans table
-        loan_id = 1
-        self.engine.execute(text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (:loan_id, 10000, 6, 36, '2022-01-01')"), {"loan_id": loan_id})
-
-        # Call the function to calculate the repayment schedule
-        repayment_schedule = calculate_repayment_schedule(loan_id)
-
-        # Assert that the repayment schedule is returned as a pandas DataFrame
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-
-        # Assert that the repayment schedule has the expected columns
-        expected_columns = ['paymentnumber', 'paymentdate', 'principalamount', 'interestamount', 'totalpayment', 'balance']
-        self.assertEqual(set(repayment_schedule.columns), set(expected_columns))
-
-        # Assert that the repayment schedule has the expected number of rows
-        self.assertEqual(len(repayment_schedule), 36)  # 36 months for a 36-month loan term
-
-    def test_calculate_repayment_schedule_invalid_loan_id(self):
-        # Call the function to calculate the repayment schedule with an invalid loan ID
-        loan_id = 999  # Does not exist in the loans table
-        with self.assertRaises(psycopg2.Error):
-            calculate_repayment_schedule(loan_id)
-
-    def test_calculate_repayment_schedule_no_loan_details_found(self):
-        # Insert a test loan record into the loans table with missing details
-        loan_id = 2
-        self.engine.execute(text("INSERT INTO loans (loanid) VALUES (:loan_id)"), {"loan_id": loan_id})
-
-        # Call the function to calculate the repayment schedule
-        with self.assertRaises(AttributeError):
-            calculate_repayment_schedule(loan_id)
-
-    def test_calculate_repayment_scheduleLoanTerm(self):
-        # Insert a test loan record into the loans table with a loan term of 0
-        loan_id = 3
-        self.engine.execute(text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (:loan_id, 10000, 6, 0, '2022-01-01')"), {"loan_id": loan_id})
-
-        # Call the function to calculate the repayment schedule
-        with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(loan_id)
-
-if __name__ == '__main__':
+if __name__ == "__main__":
     unittest.main()

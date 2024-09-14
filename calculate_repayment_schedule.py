@@ -1,18 +1,20 @@
 
+from config import engine
 from sqlalchemy import text
 import pandas as pd
 import psycopg2
-from config import engine
 
 def calculate_repayment_schedule(loan_id):
+    conn = engine.connect()
+
     # Get loan details
-    query = text("SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id")
-    result = engine.execute(query, {"loan_id": loan_id})
-    row = result.fetchone()
-    loan_amount = row[0]
-    interest_rate = row[1]
-    loan_term = row[2]
-    start_date = row[3]
+    query = text("""
+        SELECT loanamount, interestrate, loanterm, startdate
+        FROM loans
+        WHERE loanid = :loan_id
+    """)
+    result = conn.execute(query, {'loan_id': loan_id})
+    loan_amount, interest_rate, loan_term, start_date = result.fetchone()
 
     # Convert annual interest rate to monthly interest rate (divide by 12)
     monthly_interest_rate = interest_rate / 100 / 12
@@ -41,24 +43,32 @@ def calculate_repayment_schedule(loan_id):
         balance -= principal_amount
 
         # Insert repayment details into the RepaymentSchedule table
-        query = text("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)")
-        engine.execute(query, {
-            "loan_id": loan_id,
-            "payment_number": payment_number,
-            "payment_date": payment_date,
-            "principal_amount": principal_amount,
-            "interest_amount": interest_amount,
-            "monthly_payment": monthly_payment,
-            "balance": balance
+        query = text("""
+            INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
+            VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
+        """)
+        conn.execute(query, {
+            'loan_id': loan_id,
+            'payment_number': payment_number,
+            'payment_date': payment_date,
+            'principal_amount': principal_amount,
+            'interest_amount': interest_amount,
+            'monthly_payment': monthly_payment,
+            'balance': balance
         })
-        engine.commit()
 
         # Move to the next month
-        payment_date += pd.Timedelta(days=30)
+        payment_date += pd.DateOffset(months=1)
         payment_number += 1
 
+    conn.commit()
+
     # Return the repayment schedule
-    query = text("SELECT * FROM repaymentschedule WHERE loanid = :loan_id")
-    result = engine.execute(query, {"loan_id": loan_id})
+    query = text("""
+        SELECT * FROM repaymentschedule
+        WHERE loanid = :loan_id
+        ORDER BY paymentnumber
+    """)
+    result = conn.execute(query, {'loan_id': loan_id})
     repayment_schedule = pd.DataFrame(result.fetchall(), columns=[desc[0] for desc in result.cursor.description])
     return repayment_schedule
