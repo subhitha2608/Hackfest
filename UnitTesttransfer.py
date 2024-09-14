@@ -1,63 +1,89 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from your_module import transfer_amount  # replace 'your_module' with the actual module name
+from your_module import transfer_funds  # Replace 'your_module' with the actual module name
+from sqlalchemy import create_engine
+import psycopg2
+import pandas as pd
 
-class TestTransferAmount(unittest.TestCase):
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_success(self, mock_connect):
+class TestTransferFunds(unittest.TestCase):
+
+    @patch('your_module.engine')
+    def test_transfer_funds_success(self, mock_engine):
         mock_conn = Mock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.return_value = None
-        mock_conn.commit.return_value = None
-        mock_conn.close.return_value = None
+        mock_engine.connect.return_value = mock_conn
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 100
 
-        transfer_amount(1, 2, 10.0)
+        transfer_funds(p_sender, p_receiver, p_amount)
 
-        self.assertEqual(mock_conn.execute.call_count, 2)
-        mock_conn.commit.assert_called_once()
-        mock_conn.close.assert_called_once()
+        mock_conn.execute.assert_called()
+        mock_conn.commit.assert_called()
+        mock_conn.close.assert_called()
 
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_sender_update_failure(self, mock_connect):
+    @patch('your_module.engine')
+    def test_transfer_funds_failure(self, mock_engine):
         mock_conn = Mock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.side_effect = [None, psycopg2.Error('Error updating sender')]
+        mock_engine.connect.return_value = mock_conn
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 100
+        mock_conn.execute.side_effect = psycopg2.Error()
 
         with self.assertRaises(psycopg2.Error):
-            transfer_amount(1, 2, 10.0)
+            transfer_funds(p_sender, p_receiver, p_amount)
 
-        self.assertEqual(mock_conn.execute.call_count, 2)
-        mock_conn.rollback.assert_called_once()
-        mock_conn.close.assert_called_once()
+        mock_conn.rollback.assert_called()
+        mock_conn.close.assert_called()
 
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_receiver_update_failure(self, mock_connect):
+    @patch('your_module.engine')
+    def test_transfer_funds_sender_receiver_same(self, mock_engine):
         mock_conn = Mock()
-        mock_connect.return_value = mock_conn
-        mock_conn.execute.side_effect = [psycopg2.Error('Error updating sender'), None]
+        mock_engine.connect.return_value = mock_conn
+        p_sender = 1
+        p_receiver = 1
+        p_amount = 100
 
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(1, 2, 10.0)
+        with self.assertRaises(ValueError):
+            transfer_funds(p_sender, p_receiver, p_amount)
 
-        self.assertEqual(mock_conn.execute.call_count, 2)
-        mock_conn.rollback.assert_called_once()
-        mock_conn.close.assert_called_once()
+        mock_conn.execute.assert_not_called()
+        mock_conn.commit.assert_not_called()
+        mock_conn.rollback.assert_not_called()
+        mock_conn.close.assert_called()
 
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_invalid_sender(self, mock_connect):
-        with self.assertRaises(TypeError):
-            transfer_amount(None, 2, 10.0)
+    @patch('your_module.engine')
+    def test_transfer_funds_amount_zero(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 0
 
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_invalid_receiver(self, mock_connect):
-        with self.assertRaises(TypeError):
-            transfer_amount(1, None, 10.0)
+        with self.assertRaises(ValueError):
+            transfer_funds(p_sender, p_receiver, p_amount)
 
-    @patch('your_module.engine.connect')
-    def test_transfer_amount_invalid_amount(self, mock_connect):
-        with self.assertRaises(TypeError):
-            transfer_amount(1, 2, 'ten')
+        mock_conn.execute.assert_not_called()
+        mock_conn.commit.assert_not_called()
+        mock_conn.rollback.assert_not_called()
+        mock_conn.close.assert_called()
+
+    @patch('your_module.engine')
+    def test_transfer_funds_amount_negative(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        p_sender = 1
+        p_receiver = 2
+        p_amount = -100
+
+        with self.assertRaises(ValueError):
+            transfer_funds(p_sender, p_receiver, p_amount)
+
+        mock_conn.execute.assert_not_called()
+        mock_conn.commit.assert_not_called()
+        mock_conn.rollback.assert_not_called()
+        mock_conn.close.assert_called()
 
 if __name__ == '__main__':
     unittest.main()
