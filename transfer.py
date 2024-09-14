@@ -1,39 +1,36 @@
 
 from config import engine
-import sqlalchemy as sa
 import pandas as pd
+from sqlalchemy import text
 import psycopg2
 
-def transfer_funds(p_sender, p_receiver, p_amount):
+def transfer_amount(p_sender, p_receiver, p_amount):
     conn = engine.connect()
-
+    
     try:
         # Subtract the amount from the sender's account
-        update_sender_query = sa.text("""
+        update_sender_query = text("""
             UPDATE accounts
-            SET balance = balance - :p_amount
-            WHERE id = :p_sender
+            SET balance = balance - :amount
+            WHERE id = :sender
         """)
-        conn.execute(update_sender_query, {"p_sender": p_sender, "p_amount": p_amount})
-
+        conn.execute(update_sender_query, {'amount': p_amount, 'sender': p_sender})
+        
         # Add the amount to the receiver's account
-        update_receiver_query = sa.text("""
+        update_receiver_query = text("""
             UPDATE accounts
-            SET balance = balance + :p_amount
-            WHERE id = :p_receiver
+            SET balance = balance + :amount
+            WHERE id = :receiver
         """)
-        conn.execute(update_receiver_query, {"p_receiver": p_receiver, "p_amount": p_amount})
-
-        # Commit changes
+        conn.execute(update_receiver_query, {'amount': p_amount, 'receiver': p_receiver})
+        
         conn.commit()
-
-    except psycopg2.Error as e:
-        # Rollback changes if an error occurs
+    
+    except Exception as e:
         conn.rollback()
         raise e
-
+    
     finally:
-        # Close the database connection
         conn.close()
-
+    
     return None
