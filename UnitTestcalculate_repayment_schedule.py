@@ -1,57 +1,60 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from calculate_repayment_schedule import calculate_repayment_schedule
+from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    @patch('config.engine.connect')
-    @patch('config.engine.execute')
-    def test_calculate_repayment_schedule(self, mock_execute, mock_connect):
-        # Arrange
-        conn = mock_connect.return_value
-        result1 = pd.DataFrame({'loanamount': [1000], 'interestrate': [5], 'loanterm': [12], 'startdate': ['2022-01-01']})
-        conn.execute.return_value = result1
-        result2 = pd.DataFrame({'balance': [0]})
-        mock_execute.return_value = result2
+    def test_repayment_schedule(self):
+        loan_id = 1
+        calculate_repayment_schedule(loan_id)
 
-        # Act
-        result = calculate_repayment_schedule(1)
+    def test_loan_id_type(self):
+        with self.assertRaises(TypeError):
+            calculate_repayment_schedule('abc')
 
-        # Assert
-        self.assertEqual(result, 0.0)
+    def test_loan_id_non_integer(self):
+        with self.assertRaises(TypeError):
+            calculate_repayment_schedule(3.14)
 
-    @patch('config.engine.connect')
-    @patch('config.engine.execute')
-    def test_calculate_repayment_schedule_invalid_loanid(self, mock_execute, mock_connect):
-        # Arrange
-        conn = mock_connect.return_value
-        mock_execute.side_effect = psycopg2.Error('Invalid loan ID')
-
-        # Act and Assert
+    def test_loan_details_empty(self):
+        loan_id = 100
         with self.assertRaises(Exception):
-            calculate_repayment_schedule(1)
+            calculate_repayment_schedule(loan_id)
 
-    @patch('config.engine.connect')
-    @patch('config.engine.execute')
-    def test_calculate_repayment_schedule_database_error(self, mock_execute, mock_connect):
-        # Arrange
-        conn = mock_connect.return_value
-        mock_execute.side_effect = psycopg2.Error('Database error')
+    def test_loan_term_zero(self):
+        loan_id = 1
+        with self.assertRaises Exception:
+            calculate_repayment_schedule(loan_id)
 
-        # Act and Assert
-        with self.assertRaises(Exception):
-            calculate_repayment_schedule(1)
+    def test_monthly_payment_division_by_zero(self):
+        loan_id = 1
+        interest_rate = 0
+        with self.assertRaises(ZeroDivisionError):
+            calculate_repayment_schedule(loan_id, interest_rate=interest_rate)
 
-    @patch('config.engine.connect')
-    @patch('config.engine.execute')
-    def test_calculate_repayment_schedule_connection_error(self, mock_execute, mock_connect):
-        # Arrange
-        mock_connect.side_effect = psycopg2.OperationalError('Connection error')
+    def test_payment_date_type(self):
+        loan_id = 1
+        with self.assertRaises(TypeError):
+            payment_date = '2020-01-01'
+            calculate_repayment_schedule(loan_id, payment_date = payment_date)
 
-        # Act and Assert
-        with self.assertRaises(Exception):
-            calculate_repayment_schedule(1)
+    def test_repayment_schedule_insertion(self):
+        loan_id = 1
+        conn = engine.connect()
+        query = text("""
+            SELECT * FROM repaymentschedule
+            WHERE loanid = :loan_id
+        """)
+        initial_rows = conn.execute(query, loan_id=loan_id).fetchall()
+        conn.close()
+        calculate_repayment_schedule(loan_id)
+        query = text("""
+            SELECT * FROM repaymentschedule
+            WHERE loanid = :loan_id
+        """)
+        new_rows = conn.execute(query, loan_id=loan_id).fetchall()
+        conn.close()
+        self.assertTrue(initial_rows != new_rows)
 
 if __name__ == '__main__':
     unittest.main()
