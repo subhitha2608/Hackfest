@@ -1,76 +1,79 @@
 
 import unittest
-from your_module import transfer_balance  # Replace 'your_module' with the actual module name
+from your_module import transfer_balance  # Replace with the actual module name
 
 class TestTransferBalance(unittest.TestCase):
-
     def setUp(self):
-        # Create test data in the database
-        conn = engine.connect()
-        conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
-        conn.commit()
-        conn.close()
+        # Create a test database connection
+        self.conn = engine.connect()
 
     def tearDown(self):
-        # Clean up test data in the database
-        conn = engine.connect()
-        conn.execute("DELETE FROM accounts")
-        conn.commit()
-        conn.close()
+        # Close the test database connection
+        self.conn.close()
 
-    def test_transfer_balance_positive(self):
-        # Test a valid transfer
-        transfer_balance(1, 2, 20)
-        conn = engine.connect()
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 1")
-        self.assertEqual(result.scalar(), 80)
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 2")
-        self.assertEqual(result.scalar(), 70)
-        conn.close()
+    def test_positive_transfer(self):
+        # Test a successful transfer
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 10
+        initial_sender_balance = 100
+        initial_receiver_balance = 50
 
-    def test_transfer_balance_insufficient_funds(self):
-        # Test a transfer with insufficient funds
-        with self.assertRaises(Exception):
-            transfer_balance(2, 1, 60)  # Receiver has insufficient funds
-        conn = engine.connect()
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 1")
-        self.assertEqual(result.scalar(), 100)
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 2")
-        self.assertEqual(result.scalar(), 50)
-        conn.close()
+        # Set up the initial balances
+        self.conn.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {"id": p_sender, "balance": initial_sender_balance})
+        self.conn.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {"id": p_receiver, "balance": initial_receiver_balance})
+        self.conn.commit()
 
-    def test_transfer_balance_invalid_sender(self):
-        # Test a transfer with an invalid sender
-        with self.assertRaises(Exception):
-            transfer_balance(3, 2, 20)  # Sender does not exist
-        conn = engine.connect()
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 1")
-        self.assertEqual(result.scalar(), 100)
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 2")
-        self.assertEqual(result.scalar(), 50)
-        conn.close()
+        # Perform the transfer
+        transfer_balance(p_sender, p_receiver, p_amount)
 
-    def test_transfer_balance_invalid_receiver(self):
-        # Test a transfer with an invalid receiver
-        with self.assertRaises(Exception):
-            transfer_balance(1, 3, 20)  # Receiver does not exist
-        conn = engine.connect()
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 1")
-        self.assertEqual(result.scalar(), 100)
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 2")
-        self.assertEqual(result.scalar(), 50)
-        conn.close()
+        # Check the new balances
+        sender_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {"id": p_sender}).fetchone()[0]
+        receiver_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {"id": p_receiver}).fetchone()[0]
 
-    def test_transfer_balance_non_positive_amount(self):
-        # Test a transfer with a non-positive amount
-        with self.assertRaises(Exception):
-            transfer_balance(1, 2, 0)  # Amount is zero
-        conn = engine.connect()
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 1")
-        self.assertEqual(result.scalar(), 100)
-        result = conn.execute("SELECT balance FROM accounts WHERE id = 2")
-        self.assertEqual(result.scalar(), 50)
-        conn.close()
+        self.assertEqual(sender_balance, initial_sender_balance - p_amount)
+        self.assertEqual(receiver_balance, initial_receiver_balance + p_amount)
 
-if __name__ == '__main__':
+    def test_negative_transfer(self):
+        # Test a transfer with a negative amount
+        p_sender = 1
+        p_receiver = 2
+        p_amount = -10
+
+        with self.assertRaises(psycopg2.Error):
+            transfer_balance(p_sender, p_receiver, p_amount)
+
+    def test_insufficient_balance(self):
+        # Test a transfer where the sender doesn't have enough balance
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 100
+        initial_sender_balance = 50
+
+        # Set up the initial balance
+        self.conn.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {"id": p_sender, "balance": initial_sender_balance})
+        self.conn.commit()
+
+        with self.assertRaises(psycopg2.Error):
+            transfer_balance(p_sender, p_receiver, p_amount)
+
+    def test_invalid_sender_id(self):
+        # Test a transfer with an invalid sender ID
+        p_sender = 999
+        p_receiver = 2
+        p_amount = 10
+
+        with self.assertRaises(psycopg2.Error):
+            transfer_balance(p_sender, p_receiver, p_amount)
+
+    def test_invalid_receiver_id(self):
+        # Test a transfer with an invalid receiver ID
+        p_sender = 1
+        p_receiver = 999
+        p_amount = 10
+
+        with self.assertRaises(psycopg2.Error):
+            transfer_balance(p_sender, p_receiver, p_amount)
+
+if __name__ == "__main__":
     unittest.main()
