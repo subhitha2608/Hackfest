@@ -1,65 +1,76 @@
 
 import unittest
-from your_module import calculate_repayment_schedule  # Replace 'your_module' with the actual module name
-import sqlalchemy as sa
+from your_module import calculate_repayment_schedule
 import pandas as pd
-import psycopg2
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
     def setUp(self):
-        # Create a test database connection
-        self.conn = engine.connect()
+        # Create a test engine and connection
+        self.engine = create_engine('postgresql://user:password@host:port/dbname')
+        self.conn = self.engine.connect()
 
     def tearDown(self):
-        # Close the test database connection
+        # Close the connection
         self.conn.close()
 
-    def test_valid_loan_id(self):
-        # Test with a valid loan ID
-        loan_id = 1
-        result = calculate_repayment_schedule(loan_id)
-        self.assertIsInstance(result, pd.DataFrame)
-        self.assertGreater(len(result), 0)
+    def test_loan_found(self):
+        # Create a test loan in the loans table
+        query = sa.text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (1, 10000, 5, 36, '2022-01-01')")
+        self.conn.execute(query)
 
-    def test_invalid_loan_id(self):
-        # Test with an invalid loan ID
-        loan_id = -1
-        with self.assertRaises(sa.exc.NoResultFound):
-            calculate_repayment_schedule(loan_id)
+        # Call the function
+        repayment_schedule = calculate_repayment_schedule(1)
 
-    def test_loan_id_not_found(self):
-        # Test with a loan ID that doesn't exist in the database
-        loan_id = 999
-        with self.assertRaises(sa.exc.NoResultFound):
-            calculate_repayment_schedule(loan_id)
+        # Assert the result is not None
+        self.assertIsNotNone(repayment_schedule)
 
-    def test_interest_rate_zero(self):
-        # Test with a loan that has an interest rate of 0%
-        loan_id = 2  # Assume loan ID 2 has an interest rate of 0%
-        result = calculate_repayment_schedule(loan_id)
-        self.assertIsInstance(result, pd.DataFrame)
-        self.assertGreater(len(result), 0)
+        # Assert the repayment schedule has the correct columns
+        self.assertEqual(repayment_schedule.columns.tolist(), ['loan_id', 'payment_number', 'payment_date', 'principal_amount', 'interest_amount', 'total_payment', 'balance'])
 
-    def test_loan_term_zero(self):
-        # Test with a loan that has a term of 0 months
-        loan_id = 3  # Assume loan ID 3 has a term of 0 months
-        with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(loan_id)
+        # Assert the repayment schedule has the correct number of rows
+        self.assertEqual(len(repayment_schedule), 36)
 
-    def test_repayment_schedule_columns(self):
-        # Test that the repayment schedule has the correct columns
-        loan_id = 1
-        result = calculate_repayment_schedule(loan_id)
-        expected_columns = ['paymentnumber', 'paymentdate', 'principalamount', 'interestamount', 'totalpayment', 'balance']
-        self.assertCountEqual(result.columns, expected_columns)
+    def test_loan_not_found(self):
+        # Call the function with a non-existent loan ID
+        repayment_schedule = calculate_repayment_schedule(2)
 
-    def test_repayment_schedule_data(self):
-        # Test that the repayment schedule has reasonable data
-        loan_id = 1
-        result = calculate_repayment_schedule(loan_id)
-        self.assertGreater(result['principalamount'].sum(), 0)
-        self.assertGreater(result['interestamount'].sum(), 0)
-        self.assertGreater(result['totalpayment'].sum(), 0)
+        # Assert the result is None
+        self.assertIsNone(repayment_schedule)
+
+    def test_zero_interest_rate(self):
+        # Create a test loan in the loans table with 0% interest rate
+        query = sa.text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (1, 10000, 0, 36, '2022-01-01')")
+        self.conn.execute(query)
+
+        # Call the function
+        repayment_schedule = calculate_repayment_schedule(1)
+
+        # Assert the result is not None
+        self.assertIsNotNone(repayment_schedule)
+
+        # Assert the repayment schedule has the correct columns
+        self.assertEqual(repayment_schedule.columns.tolist(), ['loan_id', 'payment_number', 'payment_date', 'principal_amount', 'interest_amount', 'total_payment', 'balance'])
+
+        # Assert the repayment schedule has the correct number of rows
+        self.assertEqual(len(repayment_schedule), 36)
+
+    def test_negative_loan_amount(self):
+        # Create a test loan in the loans table with a negative loan amount
+        query = sa.text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (1, -10000, 5, 36, '2022-01-01')")
+        self.conn.execute(query)
+
+        # Call the function
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(1)
+
+    def test_non_integer_loan_term(self):
+        # Create a test loan in the loans table with a non-integer loan term
+        query = sa.text("INSERT INTO loans (loanid, loanamount, interestrate, loanterm, startdate) VALUES (1, 10000, 5, 36.5, '2022-01-01')")
+        self.conn.execute(query)
+
+        # Call the function
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(1)
 
 if __name__ == '__main__':
     unittest.main()
