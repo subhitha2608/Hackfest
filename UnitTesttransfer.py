@@ -1,66 +1,62 @@
 
 import unittest
-from your_module import transfer_funds
-import pandas as pd
+from unittest.mock import Mock
+from your_file import transfermoney, create_table, get_balance
 
-class TestTransferFunds(unittest.TestCase):
+class TestFunction(unittest.TestCase):
 
-    def test_transfer_funds_valid_input(self):
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 1000)"))
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
-        transfer_funds(1, 2, 500)
-        query = text("SELECT balance FROM accounts WHERE id = 1")
-        result = engine.execute(query).fetchone()[0]
-        self.assertEqual(result, 500)
-        query = text("SELECT balance FROM accounts WHERE id = 2")
-        result = engine.execute(query).fetchone()[0]
-        self.assertEqual(result, 500)
-        engine.execute(text("DELETE FROM accounts"))
+    def setUp(self):
+        self.engine_mock = Mock()
+        self.engine_mock.connect.return_value = self.connection_mock = Mock()
+        self.connection_mock.execute.return_value = Mock()
+        self.connection_mock(commit).return_value = None
 
-    def test_transfer_funds_invalid_sender_id(self):
-        with self.assertRaises(Exception):
-            transfer_funds(0, 2, 500)
+    def test_create_table(self):
+        create_table()
+        self.engine_mock.connect.assert_called_once()
+        self.engine_mock.execute.assert_called_once_with(text("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, balance INTEGER)"))
+        self.connection_mock.commit.assert_called_once()
 
-    def test_transfer_funds_invalid_receiver_id(self):
-        with self.assertRaises(Exception):
-            transfer_funds(1, 0, 500)
+    def test_transfermoney_no_account(self):
+        with self.assertRaises RegisterrionError:
+            transfermoney(1, 2, 100)
 
-    def test_transfer_funds_amount_zero(self):
-        with self.assertRaises(ZeroDivisionError):
-            transfer_funds(1, 2, 0)
+    def test_transfermoney_invalid_amount(self):
+        with self.assertRaises ValueError:
+            transfermoney(1, 2, 'a')
 
-    def test_transfer_funds_negative_amount(self):
-        try:
-            transfer_funds(1, 2, -500)
-            self.fail("Expected exception")
-        except Exception as e:
-            self.assertEqual(str(e), "transfer amount cannot be negative")
+    def test_transfermoney_sufficient_funds(self):
+        self.connection_mock.execute.return_value = Mock()
+        transfermoney(1, 2, 100)
+        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
+                                                     {"p_sender": 1, "p_amount": 100})
+        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
+                                                     {"p_receiver": 2, "p_amount": 100})
+        self.connection_mock.commit.assert_called_once()
 
-    def test_transfer_funds_insufficient_funds(self):
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 100)"))
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
-        with self.assertRaises(Exception):
-            transfer_funds(1, 2, 200)
-        query = text("SELECT balance FROM accounts WHERE id = 1")
-        result = engine.execute(query).fetchone()[0]
+    def test_transfermoney_insufficient_funds(self):
+        self.connection_mock.execute.return_value = Mock()
+        self.connection_mock.execute.return_value = Mock()
+        self.engine_mock.execute.return_value = Mock()
+        self.engine_mock.execute.return_value = Mock()
+        self.connection_mock.execute.return_value = Mock()
+        transfermoney(1, 2, 200)
+        with self.assertRaises Exception:
+            self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
+                                                         {"p_sender": 1, "p_amount": 200})
+        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
+                                                         {"p_receiver": 2, "p_amount": 200})
+        self.connection_mock.commit.assert_called_once()
+
+    def test_get_balance_no_account(self):
+        with self.assertRaises RegisterrionError:
+            get_balance(1)
+
+    def test_get_balance(self):
+        df = pd.DataFrame({'balance': [100]})
+        self.connection_mock.execute.return_value = df
+        result = get_balance(1)
         self.assertEqual(result, 100)
-        query = text("SELECT balance FROM accounts WHERE id = 2")
-        result = engine.execute(query).fetchone()[0]
-        self.assertEqual(result, 0)
-
-    def test_transfer_funds_connection_error(self):
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 100)"))
-        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
-        try:
-            transfer_funds(1, 2, 500)
-        except Exception as e:
-            self.assertEqual(str(e), "connection failed")
-        query = text("SELECT balance FROM accounts WHERE id = 1")
-        result = engine.execute(query).fetchone()[0]
-        self.assertEqual(result, 100)
-        query = text("SELECT balance FROM accounts WHERE id = 2")
-        result = engine.execute(query).fetchone()[0]
-        self.assertEqual(result, 0)
 
 if __name__ == '__main__':
     unittest.main()

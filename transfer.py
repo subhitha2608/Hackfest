@@ -1,20 +1,34 @@
-Python
-from sqlalchemy import text
+
+from sqlalchemy import create_engine, text
 from config import engine
 import pandas as pd
 
-def transfer_funds(sender_id, receiver_id, p_amount):
-    try:
+def transfermoney(p_sender, p_receiver, p_amount):
+    with engine.connect() as conn:
         # Subtract the amount from the sender's account
-        query = text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :sender_id")
-        engine.execute(query, {"p_amount": p_amount, "sender_id": sender_id})
+        conn.execute(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
+                     {"p_sender": p_sender, "p_amount": p_amount})
 
         # Add the amount to the receiver's account
-        query = text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :receiver_id")
-        engine.execute(query, {"p_amount": p_amount, "receiver_id": receiver_id})
+        conn.execute(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
+                     {"p_receiver": p_receiver, "p_amount": p_amount})
 
         # Commit the changes
-        engine.commit()
-    except Exception as e:
-        engine.rollback()
-        raise e
+        conn.commit()
+
+fromalchemy import create_engine, text
+
+def create_table():
+    with engine.connect() as conn:
+        conn.execute(text("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, balance INTEGER)"))
+        
+        # Commit the changes
+        conn.commit()
+
+import pandas as pd
+
+def get_balance(p_id):
+    with engine.connect() as conn:
+        df = pd.read_sql_query(text("SELECT balance FROM accounts WHERE id = :p_id"), conn, 
+                               params={"p_id": p_id})
+        return df.iloc[0]['balance']

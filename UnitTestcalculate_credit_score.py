@@ -1,53 +1,57 @@
 
 import unittest
-from your_module import calculate_credit_score
+from unittest.mock import patch, Mock
+from your_module import calculate_credit_score  # import the function to test
 
 class TestCalculateCreditScore(unittest.TestCase):
+    @patch('your_module.engine')
+    def test_calculate_credit_score(self, mock_engine):
+        # Test case 1: valid customer id, no loans
+        p_customer_id = 123
+        mock_engine.execute.return_value.fetchall.return_value = [(0, 0, 0)]  # total loan amount, total repayment, outstanding balance
+        mock_engine.execute.return_value.fetchall.return_value = [1000.0]  # credit card balance
+        mock_engine.execute.return_value.fetchall.return_value = [0]  # late pay count
+        credit_score = calculate_credit_score(p_customer_id)
+        self.assertEqual(credit_score, 550.0)
 
-    def setUp(self):
-        self.customer_id = 123
-        self.engine = create_engine('sqlite:///test_database.db') # replace with your database connection string
+        # Test case 2: valid customer id, with loans
+        p_customer_id = 456
+        mock_engine.execute.return_value.fetchall.return_value = [(1000.0, 500.0, 200.0)]  # total loan amount, total repayment, outstanding balance
+        mock_engine.execute.return_value.fetchall.return_value = [500.0]  # credit card balance
+        mock_engine.execute.return_value.fetchall.return_value = [1]  # late pay count
+        credit_score = calculate_credit_score(p_customer_id)
+        self.assertEqual(credit_score, 800.0)
 
-    def test_calculate_credit_score_valid_customer(self):
-        # Test with valid customer
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_zero_loan_amount(self):
-        # test with customer having no loans
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_zero_credit_card_balance(self):
-        # test with customer having no credit card balance
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_late_payment(self):
-        # test with customer having late payments
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_low_score(self):
-        # test with customer having very low credit score
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_zero_late_pay_count(self):
-        # test with customer having no late payments
-        result = calculate_credit_score(self.customer_id)
-        # check the calculated credit score
-
-    def test_calculate_credit_score_invalid_customer_id(self):
-        # test with invalid customer id
+        # Test case 3: invalid customer id
+        p_customer_id = 789
         with self.assertRaises(Exception):
-            result = calculate_credit_score(None)
+            calculate_credit_score(p_customer_id)
 
-    def test_calculate_credit_score_database_connection_issue(self):
-        # test with database connection issue
+        # Test case 4: no rows returned from database
+        p_customer_id = 123
+        mock_engine.execute.return_value.fetchall.return_value = []
         with self.assertRaises(Exception):
-            result = calculate_credit_score(self.customer_id)
-            engine.execute('SELECT 1')  # attempt to execute a query
+            calculate_credit_score(p_customer_id)
+
+        # Test case 5: update customer credit score
+        p_customer_id = 123
+        credit_score = calculate_credit_score(p_customer_id)
+        mock_engine.execute.assert_called_once_with(text("""
+            UPDATE customers
+            SET credit_score = ROUND(:credit_score, 0)
+            WHERE customers.id = :p_customer_id
+        """), p_customer_id=p_customer_id, credit_score=credit_score)
+
+    @patch('your_module.engine')
+    def test_log_credit_score_alert(self, mock_engine):
+        p_customer_id = 123
+        credit_score = 400
+        mock_engine.execute.return_value.fetchall.return_value = []  # dummy result
+        calculate_credit_score(p_customer_id)
+        mock_engine.execute.assert_called_once_with(text("""
+            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
+            VALUES (:p_customer_id, ROUND(:credit_score, 0), NOW())
+        """), p_customer_id=p_customer_id, credit_score=credit_score)
 
 if __name__ == '__main__':
     unittest.main()
