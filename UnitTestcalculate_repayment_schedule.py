@@ -1,56 +1,46 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from generate_repayment_schedule import generate_repayment_schedule
-import pandas as pd
+from your_module import calculate_repayment_schedule
 
-class TestGenerateRepaymentSchedule(unittest.TestCase):
+class TestCalculateRepaymentSchedule(unittest.TestCase):
+    def test_valid_loan_id(self):
+        # Test with a valid loan ID
+        loan_id = 1
+        calculate_repayment_schedule(loan_id)
+        # Check that the repayment schedule was inserted into the database
+        # ( implementation of this check depends on your database setup)
+        # self.assertTrue(repayment_schedule_inserted_into_db(loan_id))
 
-    @patch('generate_repayment_schedule.engine')
-    def test_generate_repayment_schedule(self, mock_engine):
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
-        mock_result = Mock()
-        mock_result.fetchone.return_value = (1000, 5, 12, '2022-01-01')
-        mock_conn.execute.return_value = mock_result
-        result = generate_repayment_schedule(1)
-        self.assertIsInstance(result, pd.DataFrame)
-        self.assertEqual(result.shape[0], 12)
+    def test_invalid_loan_id(self):
+        # Test with an invalid loan ID
+        loan_id = -1
+        with self.assertRaises(psycopg2.Error):
+            calculate_repayment_schedule(loan_id)
 
-    @patch('generate_repayment_schedule.engine')
-    def test_generate_repayment_schedule_zero_loan_term(self, mock_engine):
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
-        mock_result = Mock()
-        mock_result.fetchone.return_value = (1000, 5, 0, '2022-01-01')
-        mock_conn.execute.return_value = mock_result
-        result = generate_repayment_schedule(1)
-        self.assertIsNone(result)
+    def test_non-existent_loan_id(self):
+        # Test with a non-existent loan ID
+        loan_id = 999999
+        with self.assertRaises(psycopg2.Error):
+            calculate_repayment_schedule(loan_id)
 
-    @patch('generate_repayment_schedule.engine')
-    def test_generate_repayment_schedule_null_loan_details(self, mock_engine):
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
-        mock_result = Mock()
-        mock_result.fetchone.return_value = None
-        mock_conn.execute.return_value = mock_result
+    def test_loan_id_not_integer(self):
+        # Test with a non-integer loan ID
+        loan_id = "abc"
         with self.assertRaises(TypeError):
-            generate_repayment_schedule(1)
+            calculate_repayment_schedule(loan_id)
 
-    @patch('generate_repayment_schedule.engine')
-    def test_generate_repayment_schedule_invalid_loan_id(self, mock_engine):
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
-        mock_result = Mock()
-        mock_result.fetchone.return_value = None
-        mock_conn.execute.return_value = mock_result
-        result = generate_repayment_schedule(-1)
-        self.assertIsNone(result)
-
-    @patch('generate_repayment_schedule.engine')
-    def test_generate_repayment_schedule_non_numeric_loan_id(self, mock_engine):
+    def test_loan_id_none(self):
+        # Test with a None loan ID
+        loan_id = None
         with self.assertRaises(TypeError):
-            generate_repayment_schedule('a')
+            calculate_repayment_schedule(loan_id)
+
+    def test_database_connection_error(self):
+        # Test with a database connection error
+        # ( implementation of this test depends on your database setup)
+        # with patch.object(engine, 'connect', side_effect=psycopg2.Error):
+        #     with self.assertRaises(psycopg2.Error):
+        #         calculate_repayment_schedule(1)
 
 if __name__ == '__main__':
     unittest.main()

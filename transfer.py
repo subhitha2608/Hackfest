@@ -5,36 +5,25 @@ import pandas as pd
 import psycopg2
 
 def transfer_funds(p_sender, p_receiver, p_amount):
-    # Create a connection object
-    conn = engine.connect()
-
-    try:
-        # Subtract the amount from the sender's account
-        update_sender_query = text("""
-            UPDATE accounts
-            SET balance = balance - :amount
-            WHERE id = :sender
-        """)
+    # Define SQL queries as text objects
+    update_sender_query = text("""
+        UPDATE accounts
+        SET balance = balance - :amount
+        WHERE id = :sender;
+    """)
+    
+    update_receiver_query = text("""
+        UPDATE accounts
+        SET balance = balance + :amount
+        WHERE id = :receiver;
+    """)
+    
+    # Execute queries with dictionary parameters
+    with engine.connect() as conn:
         conn.execute(update_sender_query, {'sender': p_sender, 'amount': p_amount})
-
-        # Add the amount to the receiver's account
-        update_receiver_query = text("""
-            UPDATE accounts
-            SET balance = balance + :amount
-            WHERE id = :receiver
-        """)
         conn.execute(update_receiver_query, {'receiver': p_receiver, 'amount': p_amount})
-
-        # Commit the changes
+        
+        # Commit changes
         conn.commit()
 
-    except psycopg2.Error as e:
-        # Rollback on error
-        conn.rollback()
-        raise e
-
-    finally:
-        # Close the connection
-        conn.close()
-
-    return None  # or return the updated balances if needed
+    # No return statement needed, as the function only performs updates
