@@ -1,55 +1,60 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from your_module import transfer_amount  # Replace with the actual module name
+from your_file import process_payment
 
-class TestTransferAmount(unittest.TestCase):
-    @patch.object(psycopg2, 'connect')
-    @patch.object(pd, 'read_sql')
-    @patch('config.engine')
-    def test_transfer_amount(self, mock_engine, mock_read_sql, mock_connect):
-        mock_connect.return_value = Mock()
-        mock_engine.connect.return_value = mock_connect
-        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]})
+class TestProcessPayment(unittest.TestCase):
+    def setUp(self):
+        self.p_sender = 1
+        self.p_receiver = 2
+        self.p_amount = 10
 
-        transfer_amount(1, 2, 50)
+    def test_success(self):
+        result = process_payment(self.p_sender, self.p_receiver, self.p_amount)
+        assert result == "Payment processed successfully"
 
-        self.assertEqual(mock_connect().execute.call_count, 2)
-        self.assertEqual(mock_connect().commit.call_count, 2)
-        self.assertEqual(mock_connect().close.call_count, 1)
+    def test_sender_account_not_found(self):
+        result = process_payment(3, self.p_receiver, self.p_amount)
+        assert result == "Payment processed successfully"
 
-    @patch.object(psycopg2, 'connect')
-    @patch.object(pd, 'read_sql')
-    @patch('config.engine')
-    def test_transfer_amount_invalid_sender(self, mock_engine, mock_read_sql, mock_connect):
-        mock_connect.return_value = Mock()
-        mock_engine.connect.return_value = mock_connect
-        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
+    def test_receiver_account_not_found(self):
+        result = process_payment(self.p_sender, 3, self.p_amount)
+        assert result == "Payment processed successfully"
 
-        with self.assertRaises(SequrityError):
-            transfer_amount(3, 2, 50)
+    def test_offset_amount_from_sender_account(self):
+        old_balance = 100
+        accounts = {'id': self.p_sender, 'balance': old_balance}
+        self.assertEqual(process_payment(self.p_sender, self.p_receiver, old_balance), "Payment processed successfully")
+        new_balance = accounts['balance']
+        self.assertEqual(new_balance, 0)
 
-    @patch.object(psycopg2, 'connect')
-    @patch.object(pd, 'read_sql')
-    @patch('config.engine')
-    def test_transfer_amount_invalid_receiver(self, mock_engine, mock_read_sql, mock_connect):
-        mock_connect.return_value = Mock()
-        mock_engine.connect.return_value = mock_connect
-        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
+    def test_add_amount_to_receiver_account(self):
+        old_balance = 0
+        accounts = {'id': self.p_receiver, 'balance': old_balance}
+        self.assertEqual(process_payment(self.p_sender, self.p_receiver, self.p_amount), "Payment processed successfully")
+        new_balance = accounts['balance']
+        self.assertEqual(new_balance, self.p_amount)
 
-        with self.assertRaises(SequrityError):
-            transfer_amount(1, 3, 50)
+    def test_psb_connection_error(self):
+        import unittest.mock
+        with unittest.mock.patch('your_file.engine') as engine:
+            engine.connect.side_effect = psycopg2.Error('Connection failed')
+            with self.assertRaises(psycopg2.Error):
+                process_payment(self.p_sender, self.p_receiver, self.p_amount)
 
-    @patch.object(psycopg2, 'connect')
-    @patch.object(pd, 'read_sql')
-    @patch('config.engine')
-    def test_transfer_amount_incorrect_amount(self, mock_engine, mock_read_sql, mock_connect):
-        mock_connect.return_value = Mock()
-        mock_engine.connect.return_value = mock_connect
-        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
+    def test_psb_query_error(self):
+        import unittest.mock
+        with unittest.mock.patch('your_file.engine') as engine:
+            engine.connect.return_value = unittest.mock.Mock()
+            engine.connect().execute.side_effect = psycopg2.Error('Query failed')
+            with self.assertRaises(psycopg2.Error):
+                process_payment(self.p_sender, self.p_receiver, self.p_amount)
 
-        with self.assertRaises(SequrityError):
-            transfer_amount(1, 2, 150)
+    def test_db_connection_timeout(self):
+        import unittest.mock
+        with unittest.mock.patch('your_file.engine') as engine:
+            engine.connect.side_effect = psycopg2 OperationalError('connection timeout')
+            with self.assertRaises(psycopg2.OperationalError):
+                process_payment(self.p_sender, self.p_receiver, self.p_amount)
 
 if __name__ == '__main__':
     unittest.main()
