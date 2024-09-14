@@ -1,8 +1,9 @@
-Python
+
 from config import engine
 import pandas as pd
 
-def calculate_credit_score(p_customer_id):
+def update_credit_score(p_customer_id):
+    conn = engine.connect()
     total_loan_amount = 0
     total_repayment = 0
     outstanding_loan_balance = 0
@@ -11,70 +12,67 @@ def calculate_credit_score(p_customer_id):
     v_credit_score = 0
 
     # Step 1: Calculate the customer's total loan amount, total repayment, and outstanding balance
-    query = """
-        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-               COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
+    query = text("""
+        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0),
+               COALESCE(ROUND(SUM(repayment_amount), 2), 0),
                COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
         FROM loans
-        WHERE loans.customer_id = %s
-    """
-    result = engine.execute(text(query), (p_customer_id,)).fetchone()
-    if result:
-        total_loan_amount, total_repayment, outstanding_loan_balance = map(float, result)
+        WHERE loans.customer_id = :p_customer_id
+    """)
+    result = conn.execute(query, {"p_customer_id": p_customer_id}).fetchone()
+    total_loan_amount, total_repayment, outstanding_loan_balance = result
 
     # Step 2: Get the current credit card balance
-    query = """
+    query = text("""
         SELECT COALESCE(ROUND(SUM(balance), 2), 0)
         FROM credit_cards
-        WHERE credit_cards.customer_id = %s
-    """
-    result = engine.execute(text(query), (p_customer_id,)).fetchone()
-    if result:
-        credit_card_balance = float(result[0])
+        WHERE credit_cards.customer_id = :p_customer_id
+    """)
+    result = conn.execute(query, {"p_customer_id": p_customer_id}).fetchone()
+    credit_card_balance = result[0]
 
     # Step 3: Count the number of late payments
-    query = """
+    query = text("""
         SELECT COUNT(*)
         FROM payments
-        WHERE payments.customer_id = %s AND status = 'Late'
-    """
-    result = engine.execute(text(query), (p_customer_id,)).fetchone()
-    if result:
-        late_pay_count = int(result[0])
+        WHERE payments.customer_id = :p_customer_id AND status = 'Late'
+    """)
+    result = conn.execute(query, {"p_customer_id": p_customer_id}).fetchone()
+    late_pay_count = result[0]
 
-    # Credit score calculation
+    # Step 4: Basic rule-based calculation of the credit score
     if total_loan_amount > 0:
-        v_credit_score += round((total_repayment / total_loan_amount) * 400, 2)  # 40% weight for loan repayment
+        v_credit_score += round((total_repayment / total_loan_amount) * 400, 2)
     else:
-        v_credit_score += 400  # If no loans, give average score for this factor
+        v_credit_score += 400
 
     if credit_card_balance > 0:
-        v_credit_score += round((1 - (credit_card_balance / 10000)) * 300, 2)  # 30% weight for credit card utilization
+        v_credit_score += round((1 - (credit_card_balance / 10000)) * 300, 2)
     else:
         v_credit_score += 300
 
-    v_credit_score -= late_pay_count * 50  # Deduct 50 points for each late payment
+    v_credit_score -= late_pay_count * 50
 
     # Ensure the score stays within reasonable bounds (e.g., 300 to 850)
-    if v_credit_score < 300:
-        v_credit_score = 300
-    elif v_credit_score > 850:
-        v_credit_score = 850
+    v_credit_score = max(300, min(v_credit_score, 850))
 
     # Step 5: Update the customer’s credit score in the database
-    query = """
+    query = text("""
         UPDATE customers
-        SET credit_score = ROUND(%s, 0)
-        WHERE customers.id = %s
-    """
-    engine.execute(text(query), (v_credit_score, p_customer_id))
-    engine.commit()
+        SET credit_score = ROUND(:v_credit_score, 0)
+        WHERE customers.id = :p_customer_id
+    """)
+    conn.execute(query, {"p_customer_id": p_customer_id, "v_credit_score": v_credit_score})
 
     # Optionally, log the result or raise an alert for very low scores
     if v_credit_score < 500:
-        query = """
+        query = text("""
             INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (%s, ROUND(%s, 0), NOW())
-        """
-        engine.execute(text(query), (p_customer_id, v_credit_score))
-        engine.commit()
+            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
+        """)
+        conn.execute(query, {"p_customer_id": p_customer_id, "v_credit_score": v_credit_score})
+
+    conn.commit()
+    conn.close()
+
+    return v_credit_score

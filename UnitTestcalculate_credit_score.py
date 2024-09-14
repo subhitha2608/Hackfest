@@ -1,59 +1,74 @@
 Python
 import unittest
-from config import engine
-import pandas as pd
-from your_module import calculate_credit_score
+from your_module import update_credit_score
 
-class TestCalculateCreditScore(unittest.TestCase):
+class TestUpdateCreditScore(unittest.TestCase):
 
     def setUp(self):
         self.customer_id = 1
-        self.total_loan_amount = 10000
-        self.total_repayment = 5000
-        self.outstanding_loan_balance = 3000
-        self.credit_card_balance = 5000
-        self.late_pay_count = 2
 
-        engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)", (self.customer_id, self.total_loan_amount, self.total_repayment, self.outstanding_loan_balance))
-        engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)", (self.customer_id, self.credit_card_balance))
-        engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')", self.customer_id)
-        engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')", self.customer_id)
+    def test_update_credit_score_positive_total_loan_amount(self):
+        total_loan_amount = 1000
+        total_repayment = 500
+        outstanding_loan_balance = 200
+        credit_card_balance = 0
+        late_pay_count = 0
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 700)
 
-    def test_calculate_credit_score(self):
-        calculate_credit_score(self.customer_id)
-        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
-        self.assertIsNotNone(result)
-        self.assertGreaterEqual(float(result[0]), 300)
-        self.assertLessEqual(float(result[0]), 850)
+    def test_update_credit_score_negative_total_loan_amount(self):
+        total_loan_amount = -1000
+        total_repayment = 500
+        outstanding_loan_balance = -200
+        credit_card_balance = 0
+        late_pay_count = 0
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 400)
 
-    def test_calculate_credit_score_no_loans(self):
-        engine.execute("DELETE FROM loans WHERE customer_id = %s", self.customer_id)
-        calculate_credit_score(self.customer_id)
-        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
-        self.assertIsNotNone(result)
-        self.assertEqual(float(result[0]), 700)
+    def test_update_credit_score_zero_total_loan_amount(self):
+        total_loan_amount = 0
+        total_repayment = 0
+        outstanding_loan_balance = 0
+        credit_card_balance = 0
+        late_pay_count = 0
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 400)
 
-    def test_calculate_credit_score_zero_balances(self):
-        engine.execute("UPDATE loans SET loan_amount = 0 WHERE customer_id = %s", self.customer_id)
-        engine.execute("UPDATE credit_cards SET balance = 0 WHERE customer_id = %s", self.customer_id)
-        calculate_credit_score(self.customer_id)
-        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
-        self.assertIsNotNone(result)
-        self.assertEqual(float(result[0]), 700)
+    def test_update_credit_score_non_zero_credit_card_balance(self):
+        total_loan_amount = 1000
+        total_repayment = 500
+        outstanding_loan_balance = 200
+        credit_card_balance = 5000
+        late_pay_count = 0
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 550)
 
-    def test_calculate_credit_score_low_score(self):
-        engine.execute("UPDATE credits SET credit_score = 2000 WHERE id = %s", self.customer_id)
-        calculate_credit_score(self.customer_id)
-        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
-        self.assertIsNotNone(result)
-        self.assertEqual(float(result[0]), 500)
+    def test_update_credit_score_non_zero_late_pay_count(self):
+        total_loan_amount = 1000
+        total_repayment = 500
+        outstanding_loan_balance = 200
+        credit_card_balance = 0
+        late_pay_count = 5
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 350)
 
-    def tearDown(self):
-        engine.execute("DELETE FROM loans WHERE customer_id = %s", self.customer_id)
-        engine.execute("DELETE FROM credit_cards WHERE customer_id = %s", self.customer_id)
-        engine.execute("DELETE FROM payments WHERE customer_id = %s", self.customer_id)
-        engine.execute("DELETE FROM customers WHERE id = %s", self.customer_id)
+    def test_update_credit_score_below_threshold(self):
+        total_loan_amount = 0
+        total_repayment = 0
+        outstanding_loan_balance = 0
+        credit_card_balance = 0
+        late_pay_count = 10
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 300)
 
+    def test_update_credit_score_above_threshold(self):
+        total_loan_amount = 1000
+        total_repayment = 1000
+        outstanding_loan_balance = 0
+        credit_card_balance = 0
+        late_pay_count = 0
+        v_credit_score = update_credit_score(self.customer_id)
+        self.assertEqual(v_credit_score, 850)
 
 if __name__ == '__main__':
     unittest.main()

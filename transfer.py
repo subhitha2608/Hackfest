@@ -1,31 +1,26 @@
-Python
+
 from config import engine
 import pandas as pd
 
-def transfer_amount(p_sender, p_receiver, p_amount):
-    conn = engine.connect()
-    try:
-        # Subtract the amount from the sender's account
-        update_sender_account = text("""
-            UPDATE accounts
-            SET balance = balance - :p_amount
-            WHERE id = :p_sender
-        """).bindparams(p_sender=p_sender, p_amount=p_amount)
-        conn.execute(update_sender_account)
-        
-        # Add the amount to the receiver's account
-        update_receiver_account = text("""
-            UPDATE accounts
-            SET balance = balance + :p_amount
-            WHERE id = :p_receiver
-        """).bindparams(p_receiver=p_receiver, p_amount=p_amount)
-        conn.execute(update_receiver_account)
-        
-        conn.commit()
-        return None
-    
-    except Exception as e:
-        conn.rollback()
-        print(f"An error occurred: {e}")
-    finally:
-        conn.close()
+def transfer_funds(sender_id, receiver_id, amount):
+    # Subtract the amount from the sender's account
+    update_sender = text("""
+        UPDATE accounts
+        SET balance = balance - :amount
+        WHERE id = :sender_id;
+    """)
+    update_sender_params = {"sender_id": sender_id, "amount": amount}
+    engine.execute(update_sender, **update_sender_params)
+
+    # Add the amount to the receiver's account
+    update_receiver = text("""
+        UPDATE accounts
+        SET balance = balance + :amount
+        WHERE id = :receiver_id;
+    """)
+    update_receiver_params = {"receiver_id": receiver_id, "amount": amount}
+    engine.execute(update_receiver, **update_receiver_params)
+
+    # Commit the changes
+    engine.commit()
+    return None
