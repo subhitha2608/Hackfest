@@ -1,120 +1,95 @@
 
 import unittest
-from unittest.mock import patch
-from config import engine
-import pandas as pd
-import psycopg2
+from unittest.mock import patch, mock_sqlalchemy
+from your_file import calculate_credit_score
 
 class TestCalculateCreditScore(unittest.TestCase):
 
-    @patch('config.engine.connect')
-    def test_calculate_credit_score(self, mock_engine_connect):
-        # Test data
-        test_customer_id = 123
-        total_loan_amount = 10000
-        total_repayment = 5000
-        outstanding_loan_balance = 3000
-        credit_card_balance = 2000
-        late_pay_count = 2
-        expected_credit_score = 450
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_valid_input(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(100,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(1,)]
+        mock_engine.execute.text.return_value = [(5000,)]
 
-        # Mock the engine.connect function
-        mock_connection = mock_engine_connect.return_value
-        mock_connection.return_value.execute.return_value.scalar.return_value = (
-            total_loan_amount,
-            total_repayment,
-            outstanding_loan_balance,
-            credit_card_balance,
-            late_pay_count
-        )
+        result = calculate_credit_score(p_customer_id)
+        self.assertEqual(result, 600)
 
-        # Call the function
-        calculate_credit_score(test_customer_id)
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_zero_loan_amount(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(0,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(1,)]
+        mock_engine.execute.text.return_value = [(5000,)]
 
-        # Assert that the expected credit score was calculated
-        assert expected_credit_score == expected_credit_score
+        result = calculate_credit_score(p_customer_id)
+        self.assertEqual(result, 550)
 
-    @patch('config.engine.connect')
-    def test_calculate_credit_score_zero_total_loan_amount(self, mock_engine_connect):
-        # Test data
-        test_customer_id = 123
-        total_loan_amount = 0
-        total_repayment = 5000
-        outstanding_loan_balance = 3000
-        credit_card_balance = 2000
-        late_pay_count = 2
-        expected_credit_score = 300
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_no_credit_card(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(100,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(0,)]
+        mock_engine.execute.text.return_value = [(0,)]
 
-        # Mock the engine.connect function
-        mock_connection = mock_engine_connect.return_value
-        mock_connection.return_value.execute.return_value.scalar.return_value = (
-            total_loan_amount,
-            total_repayment,
-            outstanding_loan_balance,
-            credit_card_balance,
-            late_pay_count
-        )
+        result = calculate_credit_score(p_customer_id)
+        self.assertEqual(result, 550)
 
-        # Call the function
-        calculate_credit_score(test_customer_id)
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_late_payments(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(100,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(1,)]
+        mock_engine.execute.text.return_value = [(5000,)]
+        mock_engine.execute.text.return_value = [(2,)]
 
-        # Assert that the expected credit score was calculated
-        assert expected_credit_score == expected_credit_score
+        result = calculate_credit_score(p_customer_id)
+        self.assertEqual(result, 500)
 
-    @patch('config.engine.connect')
-    def test_calculate_credit_score_credit_card_balance_zero_and_late_pay_count_zero(self, mock_engine_connect):
-        # Test data
-        test_customer_id = 123
-        total_loan_amount = 10000
-        total_repayment = 5000
-        outstanding_loan_balance = 3000
-        credit_card_balance = 0
-        late_pay_count = 0
-        expected_credit_score = 800
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_very_low_score(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(100,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(1,)]
+        mock_engine.execute.text.return_value = [(1000,)]
+        mock_engine.execute.text.return_value = [(3,)]
 
-        # Mock the engine.connect function
-        mock_connection = mock_engine_connect.return_value
-        mock_connection.return_value.execute.return_value.scalar.return_value = (
-            total_loan_amount,
-            total_repayment,
-            outstanding_loan_balance,
-            credit_card_balance,
-            late_pay_count
-        )
+        result = calculate_credit_score(p_customer_id)
+        self.assertEqual(result, 550)
 
-        # Call the function
-        calculate_credit_score(test_customer_id)
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    def test_calculate_credit_score_update_customer_and_log_alert(self, mock_text, mock_engine):
+        p_customer_id = 1
+        mock_engine.execute.text.return_value = [(100,)]
+        mock_engine.execute.return_value = [(50,)]
+        mock_engine.execute.text.return_value = [(50,)]
+        mock_engine.execute.return_value = [(1,)]
+        mock_engine.execute.text.return_value = [(1000,)]
 
-        # Assert that the expected credit score was calculated
-        assert expected_credit_score == expected_credit_score
+        result = calculate_credit_score(p_customer_id)
+        mock_engine.execute.assert_called_once_with(text("UPDATE customers SET credit_score = ROUND(:v_credit_score, 0) WHERE id = :p_customer_id"), v_credit_score=550, p_customer_id=p_customer_id)
+        mock_engine.execute.assert_called_once_with(text("INSERT INTO credit_score_alerts (customer_id, credit_score, created_at) VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())"), p_customer_id=p_customer_id, v_credit_score=550)
 
-    @patch('config.engine.connect')
-    def test_calculate_credit_score_late_pay_count_greater_than_zero(self, mock_engine_connect):
-        # Test data
-        test_customer_id = 123
-        total_loan_amount = 10000
-        total_repayment = 5000
-        outstanding_loan_balance = 3000
-        credit_card_balance = 2000
-        late_pay_count = 3
-        expected_credit_score = 350
-
-        # Mock the engine.connect function
-        mock_connection = mock_engine_connect.return_value
-        mock_connection.return_value.execute.return_value.scalar.return_value = (
-            total_loan_amount,
-            total_repayment,
-            outstanding_loan_balance,
-            credit_card_balance,
-            late_pay_count
-        )
-
-        # Call the function
-        calculate_credit_score(test_customer_id)
-
-        # Assert that the expected credit score was calculated
-        assert expected_credit_score == expected_credit_score
+    def test_calculate_credit_score_invalid_input(self):
+        p_customer_id = 'test'
+        with self.assertRaises(ValueError):
+            calculate_credit_score(p_customer_id)
 
 if __name__ == '__main__':
     unittest.main()
-

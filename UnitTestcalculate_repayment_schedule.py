@@ -1,93 +1,57 @@
 
 import unittest
-from unittest.mock import patch, DEFAULT
-from your_module import calculate_repayment_schedule
-import pandas as pd
-import sqlite3
-from your_module import engine
+from unittest.mock import patch, Mock
+from calculate_repayment_schedule import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    @patch('your_module.engine')
-    def test_calculate_repayment_schedule(self, mock_engine):
-        mock_conn = mock_engine.connect.return_value
-        mock_cursor = mock_conn.execute.return_value
+    @patch('config.engine.connect')
+    @patch('config.engine.execute')
+    def test_calculate_repayment_schedule(self, mock_execute, mock_connect):
+        # Arrange
+        conn = mock_connect.return_value
+        result1 = pd.DataFrame({'loanamount': [1000], 'interestrate': [5], 'loanterm': [12], 'startdate': ['2022-01-01']})
+        conn.execute.return_value = result1
+        result2 = pd.DataFrame({'balance': [0]})
+        mock_execute.return_value = result2
 
-        calculate_repayment_schedule(1)
+        # Act
+        result = calculate_repayment_schedule(1)
 
-        mock_engine.connect.assert_called_once()
-        mock_conn.execute.assert_called_once()
-        mock_conn.execute().fetchall.assert_called_once()
-        mock_cursor.fetchall.assert_called_once()
+        # Assert
+        self.assertEqual(result, 0.0)
 
-        # get connection and cursor objects
-        conn = engine.connect()
-        cursor = conn.execute()
-        
-        # Close the connection
-        conn.close()
-        
-    def test_invalid_loan_id(self):
-        with self.assertRaises(sqlite3.Error):
-            calculate_repayment_schedule(0)
+    @patch('config.engine.connect')
+    @patch('config.engine.execute')
+    def test_calculate_repayment_schedule_invalid_loanid(self, mock_execute, mock_connect):
+        # Arrange
+        conn = mock_connect.return_value
+        mock_execute.side_effect = psycopg2.Error('Invalid loan ID')
 
-    def test_start_date_is_start_of_month(self):
-        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
-        calculate_repayment_schedule(1)
-        payment_date = '2022-01-01'
-        for i in range(2, 31):
-            payment_date = pd.to_datetime(payment_date)
-            payment_date += pd.Timedelta(days=1)
-            payment_date = payment_date.strftime('%Y-%m-%d')
-        assert payment_date
+        # Act and Assert
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(1)
 
-    def test_start_date_is_middle_of_month(self):
-        loan_details = [(10000.0, 5.0, 30, '2022-01-15')]
-        calculate_repayment_schedule(1)
-        payment_date = '2022-01-15'
-        for i in range(3, 31):
-            payment_date = pd.to_datetime(payment_date)
-            payment_date += pd.Timedelta(days=1)
-            payment_date = payment_date.strftime('%Y-%m-%d')
-        assert payment_date
+    @patch('config.engine.connect')
+    @patch('config.engine.execute')
+    def test_calculate_repayment_schedule_database_error(self, mock_execute, mock_connect):
+        # Arrange
+        conn = mock_connect.return_value
+        mock_execute.side_effect = psycopg2.Error('Database error')
 
-    def test_payment_date_is_at_the_end_of_month(self):
-        loan_details = [(10000.0, 5.0, 30, '2022-02-28')]
-        calculate_repayment_schedule(1)
-        payment_date = '2022-02-28'
-        for i in range(29, 28, -1):
-            payment_date = pd.to_datetime(payment_date)
-            payment_date += pd.Timedelta(days=1)
-            payment_date = payment_date.strftime('%Y-%m-%d')
-        assert payment_date
+        # Act and Assert
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(1)
 
-    def test_total_repayment_is_not_exceeding_loan_amount(self):
-        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
-        calculate_repayment_schedule(1)
-        total_repayment = cursor.execute(text("SELECT totalpayment FROM repaymentschedule WHERE loanid = :loan_id"), 
-                                 {'loan_id': 1}).fetchall()
-        self.assertLessEqual(total_repayment[0][0], 10000.0)
+    @patch('config.engine.connect')
+    @patch('config.engine.execute')
+    def test_calculate_repayment_schedule_connection_error(self, mock_execute, mock_connect):
+        # Arrange
+        mock_connect.side_effect = psycopg2.OperationalError('Connection error')
 
-    def test_total_repayment_is_exceeding_loan_amount(self):
-        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
-        calculate_repayment_schedule(1)
-        total_repayment = cursor.execute(text("SELECT totalpayment FROM repaymentschedule WHERE loanid = :loan_id"), 
-                                 {'loan_id': 1}).fetchall()
-        self.assertGreaterEqual(total_repayment[0][0], 10000.0)
-
-    def test_final_balance_is_zero(self):
-        loan_details = [(1000.0, 5.0, 1, '2022-01-01')]
-        calculate_repayment_schedule(1)
-        final_balance = cursor.execute(text("SELECT balance FROM repaymentschedule WHERE loanid = :loan_id ORDER BY paymentdate desc LIMIT 1"), 
-                                 {'loan_id': 1}).fetchall()
-        self.assertEqual(final_balance[0][0], 0)
-
-    def test_final_balance_is_not_zero(self):
-        loan_details = [(1000.0, 5.0, 1, '2022-01-01')]
-        calculate_repayment_schedule(1)
-        final_balance = cursor.execute(text("SELECT balance FROM repaymentschedule WHERE loanid = :loan_id ORDER BY paymentdate desc LIMIT 1"), 
-                                 {'loan_id': 1}).fetchall()
-        self.assertNotEqual(final_balance[0][0], 0)
+        # Act and Assert
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(1)
 
 if __name__ == '__main__':
     unittest.main()
