@@ -1,40 +1,22 @@
 
 from config import engine
-import pandas as pd
 from sqlalchemy import text
+import pandas as pd
 import psycopg2
 
-def transfer_funds(p_sender, p_receiver, p_amount):
-    try:
-        with engine.connect() as conn:
-            # Subtract the amount from the sender's account
-            update_sender = text("""
-                UPDATE accounts
-                SET balance = balance - :amount
-                WHERE id = :sender
-            """)
-            conn.execute(update_sender, {'sender': p_sender, 'amount': p_amount})
-            
-            # Add the amount to the receiver's account
-            update_receiver = text("""
-                UPDATE accounts
-                SET balance = balance + :amount
-                WHERE id = :receiver
-            """)
-            conn.execute(update_receiver, {'receiver': p_receiver, 'amount': p_amount})
-            
-            conn.commit()
-            
-            # Return the updated balances as a pandas DataFrame
-            query = text("""
-                SELECT id, balance
-                FROM accounts
-                WHERE id IN (:sender, :receiver)
-            """)
-            result = conn.execute(query, {'sender': p_sender, 'receiver': p_receiver})
-            df = pd.DataFrame(result.fetchall(), columns=[desc[0] for desc in result.cursor.description])
-            return df
-    
-    except psycopg2.Error as e:
-        print(f"Error: {e}")
-        return None
+def transfer_amount(p_sender, p_receiver, p_amount):
+    conn = engine.connect()
+
+    # Subtract the amount from the sender's account
+    update_sender_query = text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender")
+    conn.execute(update_sender_query, {"p_amount": p_amount, "p_sender": p_sender})
+
+    # Add the amount to the receiver's account
+    update_receiver_query = text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver")
+    conn.execute(update_receiver_query, {"p_amount": p_amount, "p_receiver": p_receiver})
+
+    conn.commit()
+    conn.close()
+
+    # No return value is expected in this case, as the procedure only updates the accounts
+    return None
