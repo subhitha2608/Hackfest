@@ -1,64 +1,62 @@
 
 from config import engine
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 import pandas as pd
 
 def calculate_repayment_schedule(loan_id):
-    # Execute a DDL command to create the RepaymentsSchedule table if it doesn't exist
-    create_table_query = """
-        CREATE TABLE IF NOT EXISTS repaymentschedule (
-            id SERIAL PRIMARY KEY,
-            loanid INTEGER,
-            paymentnumber INTEGER,
-            paymentdate DATE,
-            principalamount DECIMAL(15, 2),
-            interestamount DECIMAL(15, 2),
-            totalpayment DECIMAL(15, 2),
-            balance DECIMAL(15, 2)
-        );
-    """
-    engine.execute(text(create_table_query))
+    # Get loan details
+    conn = engine.connect()
+    loan_amount = None
+    interest_rate = None
+    loan_term = None
+    start_date = None
+    result = conn.execute(text("SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id"), {"loan_id": loan_id})
+    for row in result:
+        loan_amount, interest_rate, loan_term, start_date = row
+    conn.close()
 
-    # Execute the stored procedure equivalent query
-    query = """
-        WITH loan_details AS (
-            SELECT loanamount, interestrate, loanterm, startdate
-            FROM loans
-            WHERE loanid = :loan_id
-        ),
-        repayment_schedule AS (
-            SELECT 
-                1 AS payment_number,
-                startdate AS payment_date,
-                loanamount AS balance,
-                0 AS interest_amount,
-                loanamount AS principal_amount
-            FROM loan_details
-            UNION ALL
-            SELECT 
-                ps.payment_number + 1,
-                ps.payment_date + INTERVAL '1 month',
-                ps.balance - ps.principal_amount AS balance,
-                ps.balance * (:monthly_interest_rate / 100 / 12) AS interest_amount,
-                (:monthly_payment - ps.interest_amount) AS principal_amount
-            FROM repayment_schedule AS ps
-            WHERE ps.payment_number < :loan_term
-        )
-        INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-        SELECT 
-            :loan_id,
-            payment_number,
-            payment_date,
-            principal_amount,
-            interest_amount,
-            :monthly_payment,
-            balance
-        FROM repayment_schedule;
-    """
-    connection = engine.connect()
-    connection.execute(text(query), 
-                       loan_id=loan_id, 
-                       monthly_interest_rate=0, 
-                       monthly_payment=0, 
-                       loan_term=0)
-    connection.commit()
+    # Calculate fixed monthly payment using the amortization formula
+    monthly_interest_rate = interest_rate / 100 / 12
+    monthly_payment = (loan_amount * monthly_interest_rate) / (1 - pow(1 + monthly_interest_rate, -loan_term))
+
+    # Initialize balance to the loan amount
+    balance = loan_amount
+
+    # Initialize payment_date to the start date of the loan
+    payment_date = start_date
+
+    # Initialize payment_number to 1
+    payment_number = 1
+
+    # Initialize a list to store the repayment schedule
+    repayment_schedule = []
+
+    # Loop through each month and calculate the repayment schedule
+    while payment_number <= loan_term:
+        # Calculate interest for the current month
+        interest_amount = balance * monthly_interest_rate
+
+        # Calculate principal for the current month
+        principal_amount = monthly_payment - interest_amount
+
+        # Deduct principal from balance
+        balance -= principal_amount
+
+        # Insert repayment details into the RepaymentSchedule table
+        conn = engine.connect()
+        conn.execute(text("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) "
+                          "VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)"),
+                     {"loan_id": loan_id, "payment_number": payment_number, "payment_date": payment_date, "principal_amount": principal_amount,
+                      "interest_amount": interest_amount, "monthly_payment": monthly_payment, "balance": balance})
+        conn.close()
+
+        # Move to the next month
+        payment_date += pd.to_timedelta('1 month')
+        payment_number += 1
+
+    # Commit the changes
+    conn = engine.connect()
+    conn.commit()
+    conn.close()
+
+calculate_repayment_schedule(123)

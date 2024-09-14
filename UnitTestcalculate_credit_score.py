@@ -1,161 +1,99 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from your_module import calculate_credit_score
+from your_module import update_credit_score  # update with the actual module name
 
-class TestCalculateCreditScore(unittest.TestCase):
-
-    @patch('your_module.engine.execute')
-    def test_calculate_credit_score(self, mock_execute):
-        result1 = [(100.0, 50.0, 20.0), ]
-        result2 = [(10.0, )]
-        result3 = [(1, )]
+class TestUpdateCreditScore(unittest.TestCase):
+    @patch('your_module.engine')
+    @patch('your_module.pd')
+    @patch('your_module.conn')
+    def test_update_credit_score(self, mock_conn, mock_pd, mock_engine):
+        # Mock the engine, pandas, and connection objects
+        mock_engine.connect.return_value = mock_conn
+        mock_pd.read_sql.return_value = pd.DataFrame({'total_loan_amount': [100.0], 'total_repayment': [50.0], 'outstanding_loan_balance': [20.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'credit_card_balance': [500.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'late_pay_count': [2]})
         
-        mock_execute.side_effect = [result1, result2, result3]
-
-        p_customer_id = 1
-        calculate_credit_score(p_customer_id)
-
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
-            FROM loans
-            WHERE loans.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(balance), 2), 0)
-            FROM credit_cards
-            WHERE credit_cards.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COUNT(*)
-            FROM payments
-            WHERE payments.customer_id = :p_customer_id AND status = 'Late'
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-
-    @patch('your_module.engine.execute')
-    def test_calculate_credit_score_second_call(self, mock_execute):
-        result1 = [(200.0, 100.0, 30.0), ]
-        result2 = [(20.0, )]
-        result3 = [(2, )]
+        # Call the function
+        update_credit_score(123)
         
-        mock_execute.side_effect = [result1, result2, result3]
-
-        p_customer_id = 2
-        calculate_credit_score(p_customer_id)
-
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
-            FROM loans
-            WHERE loans.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(balance), 2), 0)
-            FROM credit_cards
-            WHERE credit_cards.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COUNT(*)
-            FROM payments
-            WHERE payments.customer_id = :p_customer_id AND status = 'Late'
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-
-    @patch('your_module.engine.execute')
-    def test_calculate_credit_score_no_loan(self, mock_execute):
-        result1 = [(0.0, 0.0, 0.0), ]
-        result2 = [(0.0, )]
-        result3 = [(0, )]
+        # Verify the expected behavior
+        mock_engine.connect.assert_called_once()
+        mock_conn.execute.assert_called_once_with(text("UPDATE customers SET credit_score = 675 WHERE customers.id = :customer_id"), {'customer_id': 123, 'v_credit_score': 675})
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
         
-        mock_execute.side_effect = [result1, result2, result3]
-
-        p_customer_id = 1
-        calculate_credit_score(p_customer_id)
-
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
-            FROM loans
-            WHERE loans.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(balance), 2), 0)
-            FROM credit_cards
-            WHERE credit_cards.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COUNT(*)
-            FROM payments
-            WHERE payments.customer_id = :p_customer_id AND status = 'Late'
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """), p_customer_id=p_customer_id, v_credit_score=400, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
-        """), p_customer_id=p_customer_id, v_credit_score=400, return_scalar=True)
-
-    @patch('your_module.engine.execute')
-    def test_calculate_credit_score_negative_value(self, mock_execute):
-        result1 = [(-100.0, 50.0, 20.0), ]
-        result2 = [(10.0, )]
-        result3 = [(1, )]
+        # Verify the scoring calculation
+        self.assertEqual(round((50.0 / 100.0) * 400, 2), 200.0)
+        self.assertEqual(round((1 - (500.0 / 10000)) * 300, 2), 180.0)
+        self.assertEqual(-2 * 50, -100)
+        self.assertEqual(mock_pd.read_sql.return_value.iloc[0]['total_loan_amount'], 100.0)
+        self.assertEqual(mock_pd.read_sql.return_value.iloc[0]['total_repayment'], 50.0)
         
-        mock_execute.side_effect = [result1, result2, result3]
-
-        p_customer_id = 1
-        calculate_credit_score(p_customer_id)
-
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-                   COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
-            FROM loans
-            WHERE loans.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COALESCE(ROUND(SUM(balance), 2), 0)
-            FROM credit_cards
-            WHERE credit_cards.customer_id = :p_customer_id
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            SELECT COUNT(*)
-            FROM payments
-            WHERE payments.customer_id = :p_customer_id AND status = 'Late'
-        """), p_customer_id=p_customer_id, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-        mock_execute.assert_any_call(text("""
-            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
-            VALUES (:p_customer_id, ROUND(:v_credit_score, 0), NOW())
-        """), p_customer_id=p_customer_id, v_credit_score=0, return_scalar=True)
-
-if __name__ == "__main__":
+    @patch('your_module.engine')
+    @patch('your_module.pd')
+    @patch('your_module.conn')
+    def test_update_credit_score_no_loans(self, mock_conn, mock_pd, mock_engine):
+        # Mock the engine, pandas, and connection objects
+        mock_engine.connect.return_value = mock_conn
+        mock_pd.read_sql.return_value = pd.DataFrame({'total_loan_amount': [0.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'credit_card_balance': [0.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'late_pay_count': [0]})
+        
+        # Call the function
+        update_credit_score(123)
+        
+        # Verify the expected behavior
+        mock_engine.connect.assert_called_once()
+        mock_conn.execute.assert_called_once_with(text("UPDATE customers SET credit_score = 400 WHERE customers.id = :customer_id"), {'customer_id': 123, 'v_credit_score': 400})
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        
+        # Verify the scoring calculation
+        self.assertEqual(400, mock_pd.read_sql.return_value.iloc[0]['total_loan_amount'])
+        self.assertEqual(0, mock_pd.read_sql.return_value.iloc[0]['credit_card_balance'])
+        self.assertEqual(0, mock_pd.read_sql.return_value.iloc[0]['late_pay_count'])
+        
+    @patch('your_module.engine')
+    @patch('your_module.pd')
+    @patch('your_module.conn')
+    def test_update_credit_score_low_score_alert(self, mock_conn, mock_pd, mock_engine):
+        # Mock the engine, pandas, and connection objects
+        mock_engine.connect.return_value = mock_conn
+        mock_pd.read_sql.return_value = pd.DataFrame({'total_loan_amount': [100.0], 'total_repayment': [50.0], 'outstanding_loan_balance': [20.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'credit_card_balance': [500.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'late_pay_count': [2]})
+        
+        # Call the function
+        update_credit_score(123)
+        
+        # Verify the expected behavior
+        mock_engine.connect.assert_called_once()
+        mock_conn.execute.assert_called_once_with(text("UPDATE customers SET credit_score = 450 WHERE customers.id = :customer_id"), {'customer_id': 123, 'v_credit_score': 450})
+        mock_conn.execute.assert_called_with(text("INSERT INTO credit_score_alerts (customer_id, credit_score, created_at) VALUES (:customer_id, 450, NOW())"), {'customer_id': 123, 'v_credit_score': 450})
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        
+    @patch('your_module.engine')
+    @patch('your_module.pd')
+    @patch('your_module.conn')
+    def test_update_credit_score_high_score_alert(self, mock_conn, mock_pd, mock_engine):
+        # Mock the engine, pandas, and connection objects
+        mock_engine.connect.return_value = mock_conn
+        mock_pd.read_sql.return_value = pd.DataFrame({'total_loan_amount': [100.0], 'total_repayment': [50.0], 'outstanding_loan_balance': [20.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'credit_card_balance': [500.0]})
+        mock_pd.read_sql.return_value = pd.DataFrame({'late_pay_count': [2]})
+        
+        # Call the function
+        update_credit_score(123)
+        
+        # Verify the expected behavior
+        mock_engine.connect.assert_called_once()
+        mock_conn.execute.assert_called_once_with(text("UPDATE customers SET credit_score = 850 WHERE customers.id = :customer_id"), {'customer_id': 123, 'v_credit_score': 850})
+        # No alert should be raised for a high score, so this should not be called
+        mock_conn.execute.assert_not_called()
+        mock_conn.commit.assert_called_once()
+        mock_conn.close.assert_called_once()
+        
+if __name__ == '__main__':
     unittest.main()

@@ -1,35 +1,32 @@
 Python
 from sqlalchemy import create_engine, text
-from sqlalchemy.engine import Engine
-from config import engine
+from sqlalchemy.engine import Connection
 import pandas as pd
 
-def transfer_amount(sender, receiver, amount):
+def transfer_amount(p_sender, p_receiver, p_amount):
+    engine = create_engine('postgresql://user:password@localhost/dbname')
+    conn = engine.connect()
+    
+    # Create a DDL command if needed
+    #cursor.execute('CREATE TABLE IF NOT EXISTS accounts (id INT, balance FLOAT);')
+    
     try:
-        # Create a connection from the engine
-        conn = engine.connect()
-
-        # Create a DDL command to check if the 'accounts' table exists
-        conn.execute("""CREATE TABLE IF NOT EXISTS accounts (
-            id SERIAL PRIMARY KEY,
-            balance INTEGER DEFAULT 0
-        )""")
-
         # Execute the SQL query with parameters
-        result = conn.execute(text("""
-            UPDATE accounts
-            SET balance = balance - :amount
-            WHERE id = :sender;
-
-            UPDATE accounts
-            SET balance = balance + :amount
-            WHERE id = :receiver;
-        "), {"sender": sender, "receiver": receiver, "amount": amount})
-
-        # Commit the transaction
+        result = conn.execute(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender").execute(), {"p_sender": p_sender, "p_amount": p_amount})
+        # Save the new data
+        conn.commit()
+        
+        # Execute the SQL query with parameters again
+        result = conn.execute(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver").execute(), {"p_receiver": p_receiver, "p_amount": p_amount})
+        # Save the new data
         conn.commit()
     except Exception as e:
+        print(f"Error: {e}")
         conn.rollback()
-        print("Error: ", str(e))
+    
     finally:
         conn.close()
+        engine.dispose()
+
+# Example usage:
+transfer_amount(1, 2, 100.0)
