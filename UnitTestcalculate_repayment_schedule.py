@@ -1,68 +1,61 @@
 
 import unittest
-from unittest.mock import patch, Mock
 from datetime import datetime, timedelta
-from loan_calculator import calculate_repayment_schedule
-from config import engine
+from decimal import Decimal
 
-class TestLoanCalculator(unittest.TestCase):
+class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    @patch('config.engine')
-    @patch('psycopg2')
-    @patch('sqlalchemy.engine')
-    def test_calculate_repayscale_not_found(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
-        loan_id = 'abc'
-        mock_engine.execute.return_value = None
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
+    def setUp(self):
+        self.engine = engine
+        self.loan_id = 1
 
-    @patch('config.engine')
-    @patch('psycopg2')
-    @patch('sqlalchemy.engine')
-    def test_calculate_repayscale_found(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
-        loan_id = 'abc'
-        loan_amount = 100000
-        interest_rate = 10
-        loan_term = 60
-        start_date = datetime(2020, 1, 1)
-        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
+    def test_calculate_repayment_schedule(self):
+        calculate_repayment_schedule(self.loan_id)
 
-    @patch('config.engine')
-    @patch('psycopg2')
-    @patch('sqlalchemy.engine')
-    def test_calculate_repayscale_invalid_input(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
-        loan_id = 'abc'
-        mock_engine.execute.return_value = (None, None, None, None)
-        with self.assertRaises(Exception):
-            calculate_repayment_schedule(loan_id)
+    def test_loan_amount_missing(self):
+        with self.assertRaises/IndexError:
+            loan_amount = pd.read_sql_query(text("SELECT loanamount FROM loans WHERE loanid = :loan_id"), self.engine, params={'loan_id': self.loan_id}).iloc[0]['loanamount']
+            calculate_repayment_schedule(self.loan_id)
 
-    @patch('config.engine')
-    @patch('psycopg2')
-    @patch('sqlalchemy.engine')
-    def test_calculate_repayscale_zero_loan_term(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
-        loan_id = 'abc'
-        loan_amount = 100000
-        interest_rate = 10
+    def test_interest_rate_zero(self):
+        start_date = datetime.now()
+        loan_amount = Decimal(1000.0)
+        interest_rate = Decimal(0.0)
+        loan_term = 12
+        calculate_repayment_schedule(self.loan_id)
+        self.assertEqual(len(pd.read_sql_query(text("SELECT * FROM repaymentschedule WHERE loanid = :loan_id"), self.engine, params={'loan_id': self.loan_id})), loan_term)
+        self.assertEqual(loan_amount, Decimal(0.0))
+
+    def test_loan_term_zero(self):
+        loan_amount = Decimal(1000.0)
+        interest_rate = Decimal(5.0)
+        start_date = datetime.now()
         loan_term = 0
-        start_date = datetime(2020, 1, 1)
-        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
+        with self.assertRaises(IndexError):
+            calculate_repayment_schedule(self.loan_id)
 
-    @patch('config.engine')
-    @patch('psycopg2')
-    @patch('sqlalchemy.engine')
-    def test_calculate_repayscale_zero_loan_amount(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
-        loan_id = 'abc'
-        loan_amount = 0
-        interest_rate = 10
-        loan_term = 60
-        start_date = datetime(2020, 1, 1)
-        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
-        result = calculate_repayment_schedule(loan_id)
-        self.assertEqual(result, [])
+    def test_start_date_missing(self):
+        loan_amount = Decimal(1000.0)
+        interest_rate = Decimal(5.0)
+        loan_term = 12
+        with self.assertRaises(IndexError):
+            calculate_repayment_schedule(self.loan_id)
+
+    def test_invalid_loan_term(self):
+        start_date = datetime.now()
+        loan_amount = Decimal(1000.0)
+        interest_rate = Decimal(5.0)
+        loan_term = -1
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(self.loan_id)
+
+    def test_invalid_interest_rate(self):
+        start_date = datetime.now()
+        loan_amount = Decimal(1000.0)
+        interest_rate = -1
+        loan_term = 12
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(self.loan_id)
 
 if __name__ == '__main__':
     unittest.main()
