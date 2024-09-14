@@ -1,80 +1,118 @@
 
 import unittest
 from unittest.mock import patch, MagicMock
-from your_module import calculate_credit_score  # Replace with the actual module name
+from your_module import calculate_credit_score
+import pandas as pd
+import psycopg2
 
 class TestCalculateCreditScore(unittest.TestCase):
     @patch('your_module.engine')
     def test_calculate_credit_score_happy_path(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (10000.0, 8000.0, 2000.0),  # total loan amount, total repayment, outstanding balance
-            (500.0,),  # credit card balance
-            (2,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+        customer_id = 1
+        mock_engine.raw_connection.return_value = MagicMock()
+        mock_connection = mock_engine.raw_connection.return_value
+        mock_connection.cursor.return_value = MagicMock()
+        mock_cursor = mock_connection.cursor.return_value
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 700)
+        # Mock query results
+        mock_cursor.fetchone.return_value = (1000.0, 800.0, 200.0)
+        mock_cursor.fetchone.return_value = (500.0,)
+        mock_cursor.fetchone.return_value = (2,)
 
-    @patch('your_module.engine')
-    def test_calculate_credit_score_zero_loan_amount(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (0.0, 0.0, 0.0),  # total loan amount, total repayment, outstanding balance
-            (500.0,),  # credit card balance
-            (2,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+        # Run the function
+        credit_score = calculate_credit_score(customer_id)
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 650)
+        # Asserts
+        self.assertEqual(credit_score, 650)
+        mock_engine.execute.assert_called()
+        mock_connection.commit.assert_called()
+        mock_connection.close.assert_called()
 
     @patch('your_module.engine')
-    def test_calculate_credit_score_zero_credit_card_balance(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (10000.0, 8000.0, 2000.0),  # total loan amount, total repayment, outstanding balance
-            (0.0,),  # credit card balance
-            (2,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+    def test_calculate_credit_score_no_loans(self, mock_engine):
+        customer_id = 1
+        mock_engine.raw_connection.return_value = MagicMock()
+        mock_connection = mock_engine.raw_connection.return_value
+        mock_connection.cursor.return_value = MagicMock()
+        mock_cursor = mock_connection.cursor.return_value
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 700)
+        # Mock query results
+        mock_cursor.fetchone.return_value = (None, None, None)
+        mock_cursor.fetchone.return_value = (500.0,)
+        mock_cursor.fetchone.return_value = (2,)
 
-    @patch('your_module.engine')
-    def test_calculate_credit_score_zero_late_payments(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (10000.0, 8000.0, 2000.0),  # total loan amount, total repayment, outstanding balance
-            (500.0,),  # credit card balance
-            (0,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+        # Run the function
+        credit_score = calculate_credit_score(customer_id)
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 750)
+        # Asserts
+        self.assertEqual(credit_score, 500)
+        mock_engine.execute.assert_called()
+        mock_connection.commit.assert_called()
+        mock_connection.close.assert_called()
 
     @patch('your_module.engine')
-    def test_calculate_credit_score_low_credit_score(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (10000.0, 8000.0, 2000.0),  # total loan amount, total repayment, outstanding balance
-            (9000.0,),  # credit card balance
-            (5,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+    def test_calculate_credit_score_no_credit_card(self, mock_engine):
+        customer_id = 1
+        mock_engine.raw_connection.return_value = MagicMock()
+        mock_connection = mock_engine.raw_connection.return_value
+        mock_connection.cursor.return_value = MagicMock()
+        mock_cursor = mock_connection.cursor.return_value
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 300)
+        # Mock query results
+        mock_cursor.fetchone.return_value = (1000.0, 800.0, 200.0)
+        mock_cursor.fetchone.return_value = (None,)
+        mock_cursor.fetchone.return_value = (2,)
+
+        # Run the function
+        credit_score = calculate_credit_score(customer_id)
+
+        # Asserts
+        self.assertEqual(credit_score, 650)
+        mock_engine.execute.assert_called()
+        mock_connection.commit.assert_called()
+        mock_connection.close.assert_called()
 
     @patch('your_module.engine')
-    def test_calculate_credit_score_high_credit_score(self, mock_engine):
-        mock_engine.execute.return_value = [
-            (0.0, 0.0, 0.0),  # total loan amount, total repayment, outstanding balance
-            (0.0,),  # credit card balance
-            (0,)  # late payment count
-        ]
-        mock_engine.raw_connection.return_value = MagicMock-commit()
+    def test_calculate_credit_score_no_late_payments(self, mock_engine):
+        customer_id = 1
+        mock_engine.raw_connection.return_value = MagicMock()
+        mock_connection = mock_engine.raw_connection.return_value
+        mock_connection.cursor.return_value = MagicMock()
+        mock_cursor = mock_connection.cursor.return_value
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 850)
+        # Mock query results
+        mock_cursor.fetchone.return_value = (1000.0, 800.0, 200.0)
+        mock_cursor.fetchone.return_value = (500.0,)
+        mock_cursor.fetchone.return_value = (0,)
+
+        # Run the function
+        credit_score = calculate_credit_score(customer_id)
+
+        # Asserts
+        self.assertEqual(credit_score, 700)
+        mock_engine.execute.assert_called()
+        mock_connection.commit.assert_called()
+        mock_connection.close.assert_called()
+
+    @patch('your_module.engine')
+    def test_calculate_credit_score_exception(self, mock_engine):
+        customer_id = 1
+        mock_engine.raw_connection.return_value = MagicMock()
+        mock_connection = mock_engine.raw_connection.return_value
+        mock_connection.cursor.return_value = MagicMock()
+        mock_cursor = mock_connection.cursor.return_value
+
+        # Mock query results
+        mock_cursor.fetchone.side_effect = psycopg2.Error('Error')
+
+        # Run the function
+        with self.assertRaises(psycopg2.Error):
+            calculate_credit_score(customer_id)
+
+        # Asserts
+        mock_engine.execute.assert_called()
+        mock_connection.rollback.assert_called()
+        mock_connection.close.assert_called()
 
 if __name__ == '__main__':
     unittest.main()

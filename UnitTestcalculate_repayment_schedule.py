@@ -1,57 +1,56 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from sqlalchemy import text
+from generate_repayment_schedule import generate_repayment_schedule
 import pandas as pd
-import psycopg2
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestGenerateRepaymentSchedule(unittest.TestCase):
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_found(self, mock_engine):
+    @patch('generate_repayment_schedule.engine')
+    def test_generate_repayment_schedule(self, mock_engine):
         mock_conn = Mock()
         mock_engine.connect.return_value = mock_conn
         mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 5, 12, '2022-01-01')
         mock_conn.execute.return_value = mock_result
-        mock_result.fetchone.return_value = (1000, 5, 60, pd.to_datetime('2022-01-01'))
+        result = generate_repayment_schedule(1)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertEqual(result.shape[0], 12)
 
-        repayment_schedule = calculate_repayment_schedule(1)
-        self.assertEqual(len(repayment_schedule), 60)
-
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_not_found(self, mock_engine):
+    @patch('generate_repayment_schedule.engine')
+    def test_generate_repayment_schedule_zero_loan_term(self, mock_engine):
         mock_conn = Mock()
         mock_engine.connect.return_value = mock_conn
         mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 5, 0, '2022-01-01')
         mock_conn.execute.return_value = mock_result
+        result = generate_repayment_schedule(1)
+        self.assertIsNone(result)
+
+    @patch('generate_repayment_schedule.engine')
+    def test_generate_repayment_schedule_null_loan_details(self, mock_engine):
+        mock_conn = Mock()
+        mock_engine.connect.return_value = mock_conn
+        mock_result = Mock()
         mock_result.fetchone.return_value = None
+        mock_conn.execute.return_value = mock_result
+        with self.assertRaises(TypeError):
+            generate_repayment_schedule(1)
 
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(1)
-
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_insertion(self, mock_engine):
+    @patch('generate_repayment_schedule.engine')
+    def test_generate_repayment_schedule_invalid_loan_id(self, mock_engine):
         mock_conn = Mock()
         mock_engine.connect.return_value = mock_conn
         mock_result = Mock()
+        mock_result.fetchone.return_value = None
         mock_conn.execute.return_value = mock_result
-        mock_result.fetchone.return_value = (1000, 5, 60, pd.to_datetime('2022-01-01'))
+        result = generate_repayment_schedule(-1)
+        self.assertIsNone(result)
 
-        with patch.object(mock_conn, 'execute') as mock_execute:
-            calculate_repayment_schedule(1)
-            self.assertEqual(mock_execute.call_count, 61)
-
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_commit(self, mock_engine):
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
-        mock_result = Mock()
-        mock_conn.execute.return_value = mock_result
-        mock_result.fetchone.return_value = (1000, 5, 60, pd.to_datetime('2022-01-01'))
-
-        with patch.object(mock_conn, 'commit') as mock_commit:
-            calculate_repayment_schedule(1)
-            self.assertEqual(mock_commit.call_count, 1)
+    @patch('generate_repayment_schedule.engine')
+    def test_generate_repayment_schedule_non_numeric_loan_id(self, mock_engine):
+        with self.assertRaises(TypeError):
+            generate_repayment_schedule('a')
 
 if __name__ == '__main__':
     unittest.main()
