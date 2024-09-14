@@ -1,44 +1,20 @@
 
 from config import engine
-import sqlalchemy as sa
+from sqlalchemy import text
 import pandas as pd
 import psycopg2
 
-def transfer_balance(p_sender, p_receiver, p_amount):
-    # Create a connection to the database
-    conn = engine.connect()
-
-    try:
+def transfer_amount(p_sender, p_receiver, p_amount):
+    with engine.connect() as conn:
         # Subtract the amount from the sender's account
-        update_sender_query = sa.text("""
-            UPDATE accounts
-            SET balance = balance - :amount
-            WHERE id = :sender
-        """)
-        conn.execute(update_sender_query, {"sender": p_sender, "amount": p_amount})
+        update_sender_query = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender")
+        conn.execute(update_sender_query, {"amount": p_amount, "sender": p_sender})
 
         # Add the amount to the receiver's account
-        update_receiver_query = sa.text("""
-            UPDATE accounts
-            SET balance = balance + :amount
-            WHERE id = :receiver
-        """)
-        conn.execute(update_receiver_query, {"receiver": p_receiver, "amount": p_amount})
+        update_receiver_query = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver")
+        conn.execute(update_receiver_query, {"amount": p_amount, "receiver": p_receiver})
 
         # Commit the changes
-        conn.execute("COMMIT")
+        conn.commit()
 
-        # Return the updated balances
-        query = sa.text("SELECT balance FROM accounts WHERE id IN (:sender, :receiver)")
-        result = conn.execute(query, {"sender": p_sender, "receiver": p_receiver})
-        balances = [row[0] for row in result.fetchall()]
-        return balances
-
-    except psycopg2.Error as e:
-        # Rollback the changes in case of an error
-        conn.execute("ROLLBACK")
-        raise e
-
-    finally:
-        # Close the connection
-        conn.close()
+    # No explicit return statement, as the function doesn't need to return a value
