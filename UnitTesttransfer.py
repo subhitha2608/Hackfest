@@ -1,62 +1,66 @@
 
 import unittest
-from unittest.mock import Mock
-from your_file import transfermoney, create_table, get_balance
+from unittest.mock import patch, Mock
+from your_module import transfer_amount
 
-class TestFunction(unittest.TestCase):
+class TestTransferAmount(unittest.TestCase):
+    @patch('your_module.engine')
+    @patch('your_module.text')
+    def test_transfer_amount(self, mock_text, mock_engine):
+        sender = 1
+        receiver = 2
+        amount = 10
 
-    def setUp(self):
-        self.engine_mock = Mock()
-        self.engine_mock.connect.return_value = self.connection_mock = Mock()
-        self.connection_mock.execute.return_value = Mock()
-        self.connection_mock(commit).return_value = None
+        # Mock the engine and text functions
+        mock_engine.connect.return_value = Mock()
+        mock_engine.connect.return_value.execute.return_value = None
+        mock_engine.connect.return_value.commit.return_value = None
+        mock_engine.connect.return_value.close.return_value = None
+        mock_text.return_value = "UPDATE accounts SET balance = balance - :amount WHERE id = :sender;\nUPDATE accounts SET balance = balance + :amount WHERE id = :receiver;"
 
-    def test_create_table(self):
-        create_table()
-        self.engine_mock.connect.assert_called_once()
-        self.engine_mock.execute.assert_called_once_with(text("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, balance INTEGER)"))
-        self.connection_mock.commit.assert_called_once()
+        # Call the transfer_amount function
+        transfer_amount(sender, receiver, amount)
 
-    def test_transfermoney_no_account(self):
-        with self.assertRaises RegisterrionError:
-            transfermoney(1, 2, 100)
+        # Assert that the engine and text functions were called correctly
+        mock_engine.connect.assert_called_once()
+        mock_engine.connect.return_value.execute.assert_called_once_with(text=mock_text.return_value, params={'sender': sender, 'receiver': receiver, 'amount': amount})
+        mock_engine.connect.return_value.commit.assert_called_once()
+        mock_engine.connect.return_value.close.assert_called_once()
 
-    def test_transfermoney_invalid_amount(self):
-        with self.assertRaises ValueError:
-            transfermoney(1, 2, 'a')
+    def test_transfer_amount_invalid_sender(self):
+        sender = 0
+        receiver = 2
+        amount = 10
 
-    def test_transfermoney_sufficient_funds(self):
-        self.connection_mock.execute.return_value = Mock()
-        transfermoney(1, 2, 100)
-        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
-                                                     {"p_sender": 1, "p_amount": 100})
-        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
-                                                     {"p_receiver": 2, "p_amount": 100})
-        self.connection_mock.commit.assert_called_once()
+        # Call the transfer_amount function
+        with self.assertRaises(ValueError):
+            transfer_amount(sender, receiver, amount)
 
-    def test_transfermoney_insufficient_funds(self):
-        self.connection_mock.execute.return_value = Mock()
-        self.connection_mock.execute.return_value = Mock()
-        self.engine_mock.execute.return_value = Mock()
-        self.engine_mock.execute.return_value = Mock()
-        self.connection_mock.execute.return_value = Mock()
-        transfermoney(1, 2, 200)
-        with self.assertRaises Exception:
-            self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
-                                                         {"p_sender": 1, "p_amount": 200})
-        self.engine_mock.execute.assert_called_with(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
-                                                         {"p_receiver": 2, "p_amount": 200})
-        self.connection_mock.commit.assert_called_once()
+    def test_transfer_amount_invalid_receiver(self):
+        sender = 1
+        receiver = 0
+        amount = 10
 
-    def test_get_balance_no_account(self):
-        with self.assertRaises RegisterrionError:
-            get_balance(1)
+        # Call the transfer_amount function
+        with self.assertRaises(ValueError):
+            transfer_amount(sender, receiver, amount)
 
-    def test_get_balance(self):
-        df = pd.DataFrame({'balance': [100]})
-        self.connection_mock.execute.return_value = df
-        result = get_balance(1)
-        self.assertEqual(result, 100)
+    def test_transfer_amount_negative_amount(self):
+        sender = 1
+        receiver = 2
+        amount = -10
+
+        # Call the transfer_amount function
+        with self.assertRaises(ValueError):
+            transfer_amount(sender, receiver, amount)
+
+    def test_transfer_amount_zero_amount(self):
+        sender = 1
+        receiver = 2
+        amount = 0
+
+        # Call the transfer_amount function
+        transfer_amount(sender, receiver, amount)
 
 if __name__ == '__main__':
     unittest.main()

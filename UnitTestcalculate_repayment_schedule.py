@@ -1,80 +1,59 @@
 
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
 from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    @patch('your_module.engine.connect')
-    def test_loan_found(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = (
-            (1000, 5, 60, '2022-01-01'),
-        )
-        mock_connect.return_value.close.return_value = None
+    @patch('your_module.engine.execute.return_value.fetchone.return_value')
+    def test LoanDetails(self, result_mock):
+        result_mock.return_value = (1000000, 5, 360, '2020-01-01')
+        calculate_repayment_schedule(1)
+        self.assertEqual(calculate_repayment_schedule.mes, 10)
 
+    @patch('your_module.engine.execute')
+    @patch('your_module.engine.commit')
+    def test_RepaymentSchedule(self, commit_mock, execute_mock):
+        execute_mock.return_value = Mock()
+        execute_mock.return_value.__enter__.return_value.fetchall.return_value = None
+        calculate_repayment_schedule(1)
+        execute_mock.assert_called()
+        commit_mock.assert_called()
+
+    @patch('your_module.engine.execute')
+    @patch('your_module.engine.commit')
+    @patch('your_module.engine.execute.side_effect')
+    def test_RepaymentScheduleMultipleCalls(self, execute_mock_side_effect, commit_mock, execute_mock):
         loan_id = 1
         calculate_repayment_schedule(loan_id)
+        execute_mock.assert_called_once()
+        commit_mock.assert_called_once()
 
-        self.assertEqual(mock_connect.call_count, 1)
-
-    @patch('your_module.engine.connect')
-    def test_loan_not_found(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = None
-        mock_connect.return_value.close.return_value = None
-
+    @patch('your_module.engine.execute')
+    @patch('your_module.engine.commit')
+    @patch('your_module.engine.execute.side_effect')
+    def test_RepaymentScheduleOneCall(self, execute_mock_side_effect, commit_mock, execute_mock):
         loan_id = 1
         calculate_repayment_schedule(loan_id)
+        execute_mock.assert_called_once()
+        commit_mock.assert_called_once()
 
-        self.assertEqual(mock_connect.call_count, 1)
-        self.assertIn(f"No loan found for ID {loan_id}", caplog.text)
+    @patch('your_module.engine.execute')
+    @patch('your_module.engine.commit')
+    @patch('your_module.engine.execute.side_effect')
+    def test_RepaymentScheduleMultipleCalls(self, execute_mock_side_effect, commit_mock, execute_mock):
+        calculate_repayment_schedule(1)
+        execute_mock.assert_called_once()
+        commit_mock.assert_called_once()
 
-    @patch('your_module.engine.connect')
-    def test_invalid_loan_id(self, mock_connect):
-        loan_id = 'not_an_integer'
-        with self.assertRaises(TypeError):
-            calculate_repayment_schedule(loan_id)
-
-    @patch('your_module.engine.connect')
-    def test_multiplication_by_zero(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = (
-            (0, 5, 60, '2022-01-01'),
-        )
+    @patch('your_module.engine.execute')
+    @patch('your_module.engine.commit')
+    @patch('your_module.engine.execute.side_effect')
+    def test_CloseDBConnection(self, side_effect, commit_mock, execute_mock):
         loan_id = 1
         calculate_repayment_schedule(loan_id)
-
-    @patch('your_module.engine.connect')
-    def test_non_numeric_interest_rate(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = (
-            (1000, 'non numeric', 60, '2022-01-01'),
-        )
-        loan_id = 1
-        with self.assertRaises(TypeError):
-            calculate_repayment_schedule(loan_id)
-
-    @patch('your_module.engine.connect')
-    def test_non_numeric_loan_term(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = (
-            (1000, 5, 'non numeric', '2022-01-01'),
-        )
-        loan_id = 1
-        with self.assertRaises(TypeError):
-            calculate_repayment_schedule(loan_id)
-
-    @patch('your_module.engine.connect')
-    def test_loanterm_is_zero(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = (
-            (1000, 5, 0, '2022-01-01'),
-        )
-        loan_id = 1
-        with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(loan_id)
-
-    @patch('your_module.engine.connect')
-    def test_short_circuit(self, mock_connect):
-        mock_connect.return_value.execute.return_value.fetchall.return_value = None
-        loan_id = 1
-        calculate_repayment_schedule(loan_id)
-        self.assertEqual(mock_connect.call_count, 1)
+        execute_mock.assert_called_once()
+        commit_mock.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()

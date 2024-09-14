@@ -1,34 +1,26 @@
-
-from sqlalchemy import create_engine, text
+Python
 from config import engine
 import pandas as pd
 
-def transfermoney(p_sender, p_receiver, p_amount):
-    with engine.connect() as conn:
-        # Subtract the amount from the sender's account
-        conn.execute(text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"), 
-                     {"p_sender": p_sender, "p_amount": p_amount})
-
-        # Add the amount to the receiver's account
-        conn.execute(text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver"), 
-                     {"p_receiver": p_receiver, "p_amount": p_amount})
-
-        # Commit the changes
-        conn.commit()
-
-fromalchemy import create_engine, text
-
-def create_table():
-    with engine.connect() as conn:
-        conn.execute(text("CREATE TABLE IF NOT EXISTS accounts (id INTEGER PRIMARY KEY, balance INTEGER)"))
-        
-        # Commit the changes
-        conn.commit()
-
+def transfer_amount(sender, receiver, amount):
+    update_account = text("""
+        UPDATE accounts SET balance = balance - :amount WHERE id = :sender;
+        UPDATE accounts SET balance = balance + :amount WHERE id = :receiver;
+    """)
+    conn = engine.connect()
+    conn.execute(update_account, {'sender': sender, 'receiver': receiver, 'amount': amount})
+    conn.commit()
+    conn.close()
+Python
 import pandas as pd
 
-def get_balance(p_id):
-    with engine.connect() as conn:
-        df = pd.read_sql_query(text("SELECT balance FROM accounts WHERE id = :p_id"), conn, 
-                               params={"p_id": p_id})
-        return df.iloc[0]['balance']
+df = pd.read_sql_query("SELECT * FROM accounts", engine)
+# Perform data transformations on df
+update_account = text("""
+    UPDATE accounts SET balance = balance - :amount WHERE id = :sender;
+    UPDATE accounts SET balance = balance + :amount WHERE id = :receiver;
+""")
+conn = engine.connect()
+conn.execute(update_account, {'sender': sender, 'receiver': receiver, 'amount': amount})
+conn.commit()
+conn.close()
