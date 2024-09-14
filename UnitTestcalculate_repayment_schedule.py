@@ -1,52 +1,66 @@
 
 import unittest
-from your_module import calculate_repayment_schedule
+from your_module import generate_repayment_schedule
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
-    def setUp(self):
-        # Create a test loan ID
-        self.loan_id = 1
-
+class TestGenerateRepaymentSchedule(unittest.TestCase):
     def test_valid_loan_id(self):
-        # Test with a valid loan ID
-        repayment_schedule = calculate_repayment_schedule(self.loan_id)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self assertEqual(repayment_schedule.shape[0], 12)  # 12 months in a year
-        self assertEqual(repayment_schedule.shape[1], 7)  # 7 columns in the repayment schedule
+        loan_id = 1
+        repayment_schedule = generate_repayment_schedule(loan_id)
+        selfassertIsNotNone(repayment_schedule)
+        selfassertGreaterThan(len(repayment_schedule), 0)
 
     def test_invalid_loan_id(self):
-        # Test with an invalid loan ID
-        with self.assertRaisesREGEX(Exception, "Loan not found"):
-            calculate_repayment_schedule(-1)
+        loan_id = -1
+        with self.assertRaises(Exception):
+            generate_repayment_schedule(loan_id)
 
-    def test_no_loan_details(self):
-        # Test when there are no loan details for the given loan ID
-        with self.assertRaisesREGEX(Exception, "No loan details found"):
-            calculate_repayment_schedule(999)  # assume this loan ID doesn't exist
+    def test_loan_id_not_found(self):
+        loan_id = 1000  # assume this loan ID does not exist in the database
+        with self.assertRaises(Exception):
+            generate_repayment_schedule(loan_id)
 
-    def test_insufficient_funds(self):
-        # Test when the loan amount is 0
-        with self.assertRaisesREGEX(ValueError, "Loan amount cannot be 0"):
-            calculate_repayment_schedule(self.loan_id, loan_amount=0)
+    def test_zero_loan_amount(self):
+        loan_id = 1
+        # assume the loan amount for this loan ID is 0
+        with self.assertRaises(ZeroDivisionError):
+            generate_repayment_schedule(loan_id)
 
-    def test_interest_rate_zero(self):
-        # Test when the interest rate is 0
-        with self.assertRaisesREGEX(ValueError, "Interest rate cannot be 0"):
-            calculate_repayment_schedule(self.loan_id, interest_rate=0)
+    def test_negative_loan_amount(self):
+        loan_id = 2
+        # assume the loan amount for this loan ID is negative
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(loan_id)
+
+    def test_invalid_interest_rate(self):
+        loan_id = 3
+        # assume the interest rate for this loan ID is invalid (e.g. negative or > 100)
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(loan_id)
 
     def test_loan_term_zero(self):
-        # Test when the loan term is 0
-        with self.assertRaisesREGEX(ValueError, "Loan term cannot be 0"):
-            calculate_repayment_schedule(self.loan_id, loan_term=0)
+        loan_id = 4
+        # assume the loan term for this loan ID is 0
+        with self.assertRaises(ZeroDivisionError):
+            generate_repayment_schedule(loan_id)
 
-    def test_start_date_in_future(self):
-        # Test when the start date is in the future
-        with self.assertRaisesREGEX(ValueError, "Start date cannot be in the future"):
-            calculate_repayment_schedule(self.loan_id, start_date=pd.Timestamp("2030-01-01"))
+    def test_loan_term_negative(self):
+        loan_id = 5
+        # assume the loan term for this loan ID is negative
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(loan_id)
 
-    def tearDown(self):
-        # Clean up any resources used during the test
-        pass
+    def test_repayment_schedule_content(self):
+        loan_id = 1
+        repayment_schedule = generate_repayment_schedule(loan_id)
+        selfassertIsNotNone(repayment_schedule)
+        for detail in repayment_schedule:
+            selfassertIn("loan_id", detail)
+            selfassertIn("payment_number", detail)
+            selfassertIn("payment_date", detail)
+            selfassertIn("principal_amount", detail)
+            selfassertIn("interest_amount", detail)
+            selfassertIn("total_payment", detail)
+            selfassertIn("balance", detail)
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
