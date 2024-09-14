@@ -1,61 +1,76 @@
 
 import unittest
-from your_module import generate_repayment_schedule  # Replace with the actual module name
+import psycopg2
 
-class TestGenerateRepaymentSchedule(unittest.TestCase):
+class TestGetUser(unittest.TestCase):
     def setUp(self):
-        # Create a test database connection
-        self.conn = engine.connect()
+        self.conn = psycopg2.connect(
+            host="localhost",
+            database="test_db",
+            user="test_user",
+            password="test_password"
+        )
+        self.cur = self.conn.cursor()
+        self.create_table_query = "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), email VARCHAR(100))"
+        self.cur.execute(self.create_table_query)
+        self.conn.commit()
 
     def tearDown(self):
-        # Close the test database connection
+        self.drop_table_query = "DROP TABLE IF EXISTS users"
+        self.cur.execute(self.drop_table_query)
+        self.conn.commit()
+        self.cur.close()
         self.conn.close()
 
-    def test_loan_found(self):
-        # Test case: loan found, valid repayment schedule generated
-        loan_id = 1  # Replace with an existing loan ID in the test database
-        repayment_schedule = generate_repayment_schedule(loan_id)
-        self.assertIsNotNone(repayment_schedule)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self.assertGreater(len(repayment_schedule), 0)
+    def test_get_user_by_id_valid_input(self):
+        self.insert_user_query = "INSERT INTO users (username, email) VALUES (%s, %s) RETURNING id"
+        self.cur.execute(self.insert_user_query, ("test_user", "test@example.com"))
+        user_id = self.cur.fetchone()[0]
+        self.conn.commit()
 
-    def test_loan_not_found(self):
-        # Test case: loan not found, None returned
-        loan_id = 999  # Replace with a non-existing loan ID in the test database
-        repayment_schedule = generate_repayment_schedule(loan_id)
-        self.assertIsNone(repayment_schedule)
+        from your_module import get_user
+        user = get_user(user_id)
+        self.assertIsNotNone(user)
+        self.assertEqual(user["id"], user_id)
+        self.assertEqual(user["username"], "test_user")
+        self.assertEqual(user["email"], "test@example.com")
+        print(f"User retrieved: {user}")
 
-    def test_invalid_loan_id(self):
-        # Test case: invalid loan ID, error raised
-        loan_id = "invalid"  # Replace with an invalid loan ID
-        with self.assertRaises(TypeError):
-            generate_repayment_schedule(loan_id)
-
-    def test_zero_interest_rate(self):
-        # Test case: zero interest rate, repayment schedule generated
-        loan_id = 2  # Replace with a loan ID with zero interest rate in the test database
-        repayment_schedule = generate_repayment_schedule(loan_id)
-        self.assertIsNotNone(repayment_schedule)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self.assertGreater(len(repayment_schedule), 0)
-
-    def test_negative_interest_rate(self):
-        # Test case: negative interest rate, error raised
-        loan_id = 3  # Replace with a loan ID with negative interest rate in the test database
+    def test_get_user_by_id_invalid_input(self):
+        from your_module import get_user
         with self.assertRaises(ValueError):
-            generate_repayment_schedule(loan_id)
+            get_user(-1)
+        print("Error: User ID should be a positive integer")
 
-    def test_invalid_loan_term(self):
-        # Test case: invalid loan term, error raised
-        loan_id = 4  # Replace with a loan ID with invalid loan term in the test database
+    def test_get_user_by_id_non_existent(self):
+        from your_module import get_user
+        user = get_user(1000)
+        self.assertIsNone(user)
+        print("User not found")
+
+    def test_get_user_by_username_valid_input(self):
+        self.insert_user_query = "INSERT INTO users (username, email) VALUES (%s, %s)"
+        self.cur.execute(self.insert_user_query, ("test_user", "test@example.com"))
+        self.conn.commit()
+
+        from your_module import get_user
+        user = get_user(username="test_user")
+        self.assertIsNotNone(user)
+        self.assertEqual(user["username"], "test_user")
+        self.assertEqual(user["email"], "test@example.com")
+        print(f"User retrieved: {user}")
+
+    def test_get_user_by_username_invalid_input(self):
+        from your_module import get_user
         with self.assertRaises(ValueError):
-            generate_repayment_schedule(loan_id)
+            get_user(username="")
+        print("Error: Username should not be empty")
 
-    def test_database_error(self):
-        # Test case: database error, error message printed
-        loan_id = 5  # Replace with a loan ID that causes a database error
-        with self.assertRaises(psycopg2.Error):
-            generate_repayment_schedule(loan_id)
+    def test_get_user_by_username_non_existent(self):
+        from your_module import get_user
+        user = get_user(username="non_existent_user")
+        self.assertIsNone(user)
+        print("User not found")
 
 if __name__ == "__main__":
     unittest.main()
