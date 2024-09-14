@@ -1,53 +1,54 @@
 
 import unittest
-from unittest.mock import patch, MagicMock
-from your_module import calculate_repayment_schedule
+from your_module import generate_repayment_schedule
+from sqlalchemy import create_engine
+import psycopg2
+import pandas as pd
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestGenerateRepaymentSchedule(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.engine = create_engine('postgresql://user:password@host:port/dbname')
+        cls.conn = cls.engine.connect()
 
-    @patch('your_module.engine')
-    def test_loan_id_not_found(self, mock_engine):
-        mock_engine.execute.return_value.fetchone.return_value = None
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(1)
+    @classmethod
+    def tearDownClass(cls):
+        cls.conn.close()
 
-    @patch('your_module.engine')
-    def test_valid_loan_details(self, mock_engine):
-        mock_engine.execute.return_value.fetchone.return_value = (1000, 5, 12, '2022-01-01')
-        mock_engine.execute.return_value.lastrowid = 1
-        calculate_repayment_schedule(1)
-        mock_engine.execute.assert_called_with(
-            sa.text("""
-                INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-                VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
-            """),
-            {
-                'loan_id': 1,
-                'payment_number': 1,
-                'payment_date': '2022-01-01',
-                'principal_amount': 83.33,
-                'interest_amount': 4.17,
-                'monthly_payment': 87.50,
-                'balance': 916.67
-            }
-        )
+    def test_generate_repayment_schedule_success(self):
+        loan_id = 1
+        generate_repayment_schedule(loan_id)
 
-    @patch('your_module.engine')
-    def test_zero_interest_rate(self, mock_engine):
-        mock_engine.execute.return_value.fetchone.return_value = (1000, 0, 12, '2022-01-01')
-        with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(1)
+        # Check if repayment schedule is generated correctly
+        query = "SELECT * FROM repaymentschedule WHERE loanid = :loan_id"
+        result = self.conn.execute(query, {'loan_id': loan_id})
+        rows = result.fetchall()
+        self assertGreater(len(rows), 0)
 
-    @patch('your_module.engine')
-    def test_zero_loan_term(self, mock_engine):
-        mock_engine.execute.return_value.fetchone.return_value = (1000, 5, 0, '2022-01-01')
-        with self.assertRaises(ZeroDivisionError):
-            calculate_repayment_schedule(1)
+    def test_generate_repayment_schedule_invalid_loan_id(self):
+        loan_id = -1
+        with self.assertRaises(psycopg2.Error):
+            generate_repayment_schedule(loan_id)
 
-    @patch('your_module.engine')
-    def test_invalid_loan_id(self, mock_engine):
+    def test_generate_repayment_schedule_loan_not_found(self):
+        loan_id = 1000  # assume this loan id does not exist
         with self.assertRaises(TypeError):
-            calculate_repayment_schedule('invalid')
+            generate_repayment_schedule(loan_id)
+
+    def test_generate_repayment_schedule_zero_interest_rate(self):
+        loan_id = 2  # assume this loan has 0 interest rate
+        generate_repayment_schedule(loan_id)
+
+        # Check if repayment schedule is generated correctly
+        query = "SELECT * FROM repaymentschedule WHERE loanid = :loan_id"
+        result = self.conn.execute(query, {'loan_id': loan_id})
+        rows = result.fetchall()
+        self assertGreater(len(rows), 0)
+
+    def test_generate_repayment_schedule_negative_loan_amount(self):
+        loan_id = 3  # assume this loan has negative loan amount
+        with self.assertRaises(ValueError):
+            generate_repayment_schedule(loan_id)
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,30 +1,19 @@
 
 from config import engine
-import sqlalchemy as sa
+from sqlalchemy import text
 import pandas as pd
 import psycopg2
 
-def calculate_repayment_schedule(loan_id):
-    # Initialize variables
-    loan_amount = None
-    interest_rate = None
-    loan_term = None
-    start_date = None
-    monthly_interest_rate = None
-    monthly_payment = None
-    balance = None
-    principal_amount = None
-    interest_amount = None
-    payment_date = None
-    payment_number = 1
+def generate_repayment_schedule(loan_id):
+    conn = engine.connect()
 
     # Get loan details
-    query = sa.text("""
+    query = text("""
         SELECT loanamount, interestrate, loanterm, startdate
         FROM loans
         WHERE loanid = :loan_id
     """)
-    result = engine.execute(query, {'loan_id': loan_id})
+    result = conn.execute(query, {'loan_id': loan_id})
     row = result.fetchone()
     loan_amount, interest_rate, loan_term, start_date = row
 
@@ -40,6 +29,9 @@ def calculate_repayment_schedule(loan_id):
     # Initialize payment_date to the start date of the loan
     payment_date = start_date
 
+    # Initialize payment number
+    payment_number = 1
+
     # Loop through each month and calculate the repayment schedule
     while payment_number <= loan_term:
         # Calculate interest for the current month
@@ -52,11 +44,11 @@ def calculate_repayment_schedule(loan_id):
         balance -= principal_amount
 
         # Insert repayment details into the RepaymentSchedule table
-        query = sa.text("""
+        query = text("""
             INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
             VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
         """)
-        engine.execute(query, {
+        conn.execute(query, {
             'loan_id': loan_id,
             'payment_number': payment_number,
             'payment_date': payment_date,
@@ -65,10 +57,15 @@ def calculate_repayment_schedule(loan_id):
             'monthly_payment': monthly_payment,
             'balance': balance
         })
-        engine.commit()
 
         # Move to the next month
-        payment_date += pd.DateOffset(months=1)
+        payment_date += pd.Timedelta('1 month')
         payment_number += 1
 
-    return None
+    # Commit changes
+    conn.commit()
+
+    # Close connection
+    conn.close()
+
+    return None  # Return None as per the original procedure
