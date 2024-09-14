@@ -1,65 +1,65 @@
 
 import unittest
-from datetime import date
-from loan_repayment_schedule import calculate_repayment_schedule
+from your_module import calculate_repayment_schedule
+import datetime
 
-class TestLoanRepaymentSchedule(unittest.TestCase):
+class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    def test_calculate_repayment_schedule_valid_loan(self):
+    def test_valid_loan(self):
         loan_id = 1
-        loan_details = {
-            'loanamount': 100000,
-            'interestrate': 6,
-            'loanterm': 5,
-            'startdate': date(2022, 1, 1)
-        }
-        calculate_repayment_schedule(loan_id, **loan_details)
+        loan_amount = 100000
+        interest_rate = 6
+        loan_term = 60
 
-    def test_calculate_repayment_schedule_invalid_loan_id(self):
+        # Mock the engine and connection
+        engine = MockEngine()
+        engine.execute.return_value = [(loan_amount, interest_rate, loan_term, datetime.date(2022, 1, 1))]
+
+        # Call the function
+        data = calculate_repayment_schedule(loan_id)
+
+        # Check the length of the data
+        self.assertEqual(len(data), loan_term)
+
+        # Check the values in the data
+        for i, row in enumerate(data):
+            payment_date = datetime.date(2022, 1, 1) + datetime.timedelta(days=30*(i+1))
+            expected_principal_amount = (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-1)) - (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-2))
+            expected_interest_amount = loan_amount * (1 + interest_rate/100/12)**(-i-1) - (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-2))
+            expected_monthly_payment = (loan_amount * interest_rate/100/12) / (1 - (1 + interest_rate/100/12)**(-loan_term))
+            self.assertEqual(row["payment_date"], payment_date)
+            self.assertAlmostEqual(row["principal_amount"], expected_principal_amount, places=6)
+            self.assertAlmostEqual(row["interest_amount"], expected_interest_amount, places=6)
+            self.assertAlmostEqual(row["totalpayment"], expected_monthly_payment, places=6)
+
+    def test_invalid_loan_id(self):
         loan_id = 0
-        with self.assertRaises(Exception):
+        with self.assertRaises(ValueError):
             calculate_repayment_schedule(loan_id)
 
-    def test_calculate_repayment_schedule_invalid_loan_details(self):
-        loan_id = 1
-        loan_details = {
-            'loanamount': 0,
-            'interestrate': -1,
-            'loanterm': 0,
-            'startdate': date(2022, 1, 1)
-        }
-        with self.assertRaises(Exception):
-            calculate_repayment_schedule(loan_id, **loan_details)
+    def test_loans_table_empty(self):
+        engine = MockEngine()
+        engine.execute.return_value = None
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(1)
 
-    def test_calculate_repayment_schedule_database_error(self):
-        loan_id = 1
-        loan_details = {
-            'loanamount': 100000,
-            'interestrate': 6,
-            'loanterm': 5,
-            'startdate': date(2022, 1, 1)
-        }
-        with unittest.mock.patch('loan_repayment_schedule.engine.connect') as connect:
-            connect.side_effect = psycopg2.Error('test error')
-            with self.assertRaises(Exception):
-                calculate_repayment_schedule(loan_id, **loan_details)
+    def test_connection_error(self):
+        engine = MockEngine()
+        engine.execute.side_effect = psycopg2.Error(' mock error')
+        with self.assertRaises(psycopg2.Error):
+            calculate_repayment_schedule(1)
 
-    def test_calculate_repayment_schedule_rollback(self):
-        loan_id = 1
-        loan_details = {
-            'loanamount': 100000,
-            'interestrate': 6,
-            'loanterm': 5,
-            'startdate': date(2022, 1, 1)
-        }
-        with unittest.mock.patch('loan_repayment_schedule.engine.connect') as connect:
-            with unittest.mock.patch('loan_repayment_schedule.conn.commit') as commit:
-                connect.return_value = unittest.mock.Mock(spec=psycopg2.connect)
-                commit.side_effect = psycopg2.Error('test error')
-                with self.assertRaises(Exception):
-                    calculate_repayment_schedule(loan_id, **loan_details)
-                self.assertRaises(psycopg2.Error, commit)
-                self.assertIsNotNone(connect.return_value.rollback.called)
+class MockEngine:
+    def __init__(self):
+        self.execute = lambda query, params: MockConnection(query, params)
+
+class MockConnection:
+    def __init__(self, query, params):
+        self.query = query
+        self.params = params
+
+    def fetchone(self):
+        return [(100000, 6, 60, datetime.date(2022, 1, 1))]
 
 if __name__ == '__main__':
     unittest.main()

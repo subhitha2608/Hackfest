@@ -1,64 +1,61 @@
-Python
+
 from config import engine
 from sqlalchemy import text
 import pandas as pd
 import psycopg2
 
 def calculate_repayment_schedule(loan_id):
-    # Connect to the database
-    conn = engine.connect()
+    # Get loan details
+    query = text("""
+        SELECT loanamount, interestrate, loanterm, startdate
+        FROM loans
+        WHERE loanid = :loan_id
+    """)
+    result = engine.execute(query, {"loan_id": loan_id}).fetchone()
+    loan_amount, interest_rate, loan_term, start_date = result
 
-    try:
-        # Get loan details
-        query = text("""SELECT loanamount, interestrate, loanterm, startdate 
-                        FROM loans 
-                        WHERE loanid = :loan_id""")
-        result = conn.execute(query, loan_id=loan_id).fetchone()
-        loan_amount, interest_rate, loan_term, start_date = result
+    # Convert annual interest rate to monthly interest rate (divide by 12)
+    monthly_interest_rate = interest_rate / 100 / 12
 
-        # Convert annual interest rate to monthly interest rate (divide by 12)
-        monthly_interest_rate = interest_rate / 100 / 12
+    # Calculate fixed monthly payment using the amortization formula
+    monthly_payment = (loan_amount * monthly_interest_rate) / (1 - (1 + monthly_interest_rate) ** (-loan_term))
 
-        # Calculate fixed monthly payment using the amortization formula
-        monthly_payment = (loan_amount * monthly_interest_rate) / (1 - (1 + monthly_interest_rate) ** -loan_term)
+    # Initialize balance to the loan amount
+    balance = loan_amount
 
-        # Initialize balance to the loan amount
-        balance = loan_amount
+    # Initialize payment_date to the start date of the loan
+    payment_date = start_date
 
-        # Initialize payment_date to the start date of the loan
-        payment_date = start_date
+    # Loop through each month and calculate the repayment schedule
+    payment_number = 1
+    data = []
+    while payment_number <= loan_term:
+        # Calculate interest for the current month
+        interest_amount = balance * monthly_interest_rate
 
-        # Initialize payment_number to 1
-        payment_number = 1
+        # Calculate principal for the current month
+        principal_amount = monthly_payment - interest_amount
 
-        # Loop through each month and calculate the repayment schedule
-        while payment_number <= loan_term:
-            # Calculate interest for the current month
-            interest_amount = balance * monthly_interest_rate
+        # Deduct principal from balance
+        balance = balance - principal_amount
 
-            # Calculate principal for the current month
-            principal_amount = monthly_payment - interest_amount
+        # Insert repayment details into the RepaymentSchedule table
+        query = text("""
+            INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
+            VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
+        """)
+        engine.execute(query, {
+            "loan_id": loan_id,
+            "payment_number": payment_number,
+            "payment_date": payment_date,
+            "principal_amount": principal_amount,
+            "interest_amount": interest_amount,
+            "monthly_payment": monthly_payment,
+            "balance": balance
+        })
 
-            # Deduct principal from balance
-            balance = balance - principal_amount
+        # Move to the next month
+        payment_date = payment_date + psycopg2.DateDelta(1)
+        payment_number += 1
 
-            # Insert repayment details into the RepaymentSchedule table
-            query = text("""INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-                           VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)""")
-            conn.execute(query, loan_id=loan_id, payment_number=payment_number, payment_date=payment_date, principal_amount=principal_amount, interest_amount=interest_amount, monthly_payment=monthly_payment, balance=balance)
-
-            # Move to the next month
-            payment_date += pd.DateOffset(months=1)
-            payment_number += 1
-
-        # Commit changes
-        conn.commit()
-
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
-        if conn:
-            conn.rollback()
-
-    finally:
-        if conn:
-            conn.close()
+    return data

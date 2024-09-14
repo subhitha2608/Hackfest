@@ -1,28 +1,28 @@
-Python
+
 from config import engine
 import pandas as pd
 from sqlalchemy import text
-import psycopg2
 
-def transaction(p_sender, p_receiver, p_amount):
-    try:
-        conn = engine.connect()
-        query = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender")
-        conn.execute(query, {"sender": p_sender, "amount": p_amount})
-        conn.commit()
-        
-        query = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver")
-        conn.execute(query, {"receiver": p_receiver, "amount": p_amount})
-        conn.commit()
-        
-        # If you need the updated balances
-        query = text("SELECT * FROM accounts WHERE id = :sender OR id = :receiver")
-        result = conn.execute(query, {"sender": p_sender, "receiver": p_receiver}).fetchall()
-        conn.commit()
-        
-        conn.close()
-        return result
-    except (Exception, psycopg2.DatabaseError) as error:
-        print(error)
+def transfer_funds(sender_id, receiver_id, amount):
+    # Subtract the amount from the sender's account
+    sender_query = text("""
+        UPDATE accounts
+        SET balance = balance - :amount
+        WHERE id = :sender_id
+    """)
+    result = engine.execute(sender_query, {'sender_id': sender_id, 'amount': amount})
+    sender_result = result.fetchall()
 
-result = transaction(1, 2, 100.0)
+    # Add the amount to the receiver's account
+    receiver_query = text("""
+        UPDATE accounts
+        SET balance = balance + :amount
+        WHERE id = :receiver_id
+    """)
+    result = engine.execute(receiver_query, {'receiver_id': receiver_id, 'amount': amount})
+    receiver_result = result.fetchall()
+
+    # Commit the changes
+    engine.execute("commit")
+
+    return sender_result, receiver_result
