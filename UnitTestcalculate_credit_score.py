@@ -1,94 +1,85 @@
 
 import unittest
 from unittest.mock import patch, Mock
+from your_module import calculate_credit_score
 
 class TestCalculateCreditScore(unittest.TestCase):
 
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    @patch('pandas.DataFrame')
-    def test_calculate_credit_score(self, mock_pandas_df, mock_connect, mock_config_engine):
-        mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (100, 50, 20)
-        mock_cursor.execute.return_value = mock_cursor
-        mock_connect.return_value = mock_cursor
-        mock_df = Mock()
-        mock_pandas_df.return_value = mock_df
-        mock_engine = Mock()
-        mock_engine.connect.return_value = mock_cursor
-        mock_config_engine.return_value = mock_engine
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_positive(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (1,)]
 
-        self.assertEqual(calculate_credit_score(1), 600)
+        credit_score = calculate_credit_score(1)
 
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    @patch('pandas.DataFrame')
-    def test_calculate_credit_score_no_loans(self, mock_pandas_df, mock_connect, mock_config_engine):
-        mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (0, 0, 0)
-        mock_cursor.execute.return_value = mock_cursor
-        mock_connect.return_value = mock_cursor
-        mock_df = Mock()
-        mock_pandas_df.return_value = mock_df
-        mock_engine = Mock()
-        mock_engine.connect.return_value = mock_cursor
-        mock_config_engine.return_value = mock_engine
+        self.assertEqual(credit_score, 750)
+        mock_execute.assert_called()
 
-        self.assertEqual(calculate_credit_score(1), 700)
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_negative_loan_amount(self, mock_execute):
+        mock_execute.return_value = [(0, 0, 0), (500, 250), (1,)]
 
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    @patch('pandas.DataFrame')
-    def test_calculate_credit_score_no_credit_card(self, mock_pandas_df, mock_connect, mock_config_engine):
-        mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (100, 50, 20)
-        mock_cursor.execute.return_value = mock_cursor
-        mock_connect.return_value = mock_cursor
-        mock_df = Mock()
-        mock_pandas_df.return_value = mock_df
-        mock_engine = Mock()
-        mock_engine.connect.return_value = mock_cursor
-        mock_config_engine.return_value = mock_engine
+        credit_score = calculate_credit_score(1)
 
-        self.assertEqual(calculate_credit_score(1), 700)
+        self.assertEqual(credit_score, 650)
+        mock_execute.assert_called()
 
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    @patch('pandas.DataFrame')
-    def test_calculate_credit_score_late_payments(self, mock_pandas_df, mock_connect, mock_config_engine):
-        mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (100, 50, 20)
-        mock_cursor.execute.return_value = mock_cursor
-        mock_connect.return_value = mock_cursor
-        mock_df = Mock()
-        mock_pandas_df.return_value = mock_df
-        mock_engine = Mock()
-        mock_engine.connect.return_value = mock_cursor
-        mock_config_engine.return_value = mock_engine
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_zero_credit_card_balance(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (0, 250), (1,)]
 
-        self.assertEqual(calculate_credit_score(1), 550)
+        credit_score = calculate_credit_score(1)
 
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    @patch('pandas.DataFrame')
-    def test_calculate_credit_score_update_customer(self, mock_pandas_df, mock_connect, mock_config_engine):
-        mock_cursor = Mock()
-        mock_cursor.fetchone.return_value = (100, 50, 20)
-        mock_cursor.execute.return_value = mock_cursor
-        mock_connect.return_value = mock_cursor
-        mock_df = Mock()
-        mock_pandas_df.return_value = mock_df
-        mock_engine = Mock()
-        mock_engine.connect.return_value = mock_cursor
-        mock_config_engine.return_value = mock_engine
-        
-        calculate_credit_score(1)
-        
-        mock_cursor.execute.assert_called_once_with(text("""
-            UPDATE customers
-            SET credit_score = ROUND(:v_credit_score, 0)
-            WHERE customers.id = :p_customer_id
-        """), {"p_customer_id": 1, "v_credit_score": 600})
+        self.assertEqual(credit_score, 800)
+        mock_execute.assert_called()
+
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_late_payments(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (3,)]
+
+        credit_score = calculate_credit_score(1)
+
+        self.assertEqual(credit_score, 650)
+        mock_execute.assert_called()
+
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_low_credit_score(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (1,)]
+
+        credit_score = calculate_credit_score(1)
+
+        self.assertEqual(credit_score, 300)
+        mock_execute.assert_called()
+
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_high_credit_score(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (1,)]
+
+        credit_score = calculate_credit_score(1)
+
+        self.assertEqual(credit_score, 850)
+        mock_execute.assert_called()
+
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_log_credit_score_alert(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (1,)]
+
+        credit_score = calculate_credit_score(1)
+
+        mock_execute.assert_called_twice()
+        mock_execute.return_value.fetchone().fetchall()
+        mock_execute.return_value.fetchall().value().format()
+        mock_execute.assert_called()
+
+    @patch('your_module.engine.execute')
+    def test_calculate_credit_score_no_credit_score_alert(self, mock_execute):
+        mock_execute.return_value = [(1000, 800, 200), (500, 250), (2,)]
+
+        credit_score = calculate_credit_score(1)
+
+        mock_execute.assert_called()
+        mock_execute.return_value.fetchone().fetchall()
+        mock_execute.return_value.fetchall().value().format()
+        mock_execute.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
