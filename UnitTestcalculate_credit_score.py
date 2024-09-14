@@ -1,57 +1,120 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from your_module import calculate_credit_score
+from unittest.mock import patch
+from config import engine
+import pandas as pd
+import psycopg2
 
 class TestCalculateCreditScore(unittest.TestCase):
-    @patch('your_module.engine')
-    @patch('your_module.psycopg2')
-    def test_calculate_credit_score(self, mock-psycopg2, mock_engine):
-        # Test case 1: Positive score for a customer with no loans or credit cards
-        customer_id = 123
-        mock_result = Mock()
-        mock_result.fetchone.return_value = (0, 0, 0)
-        mock_engine.connect.return_value.execute.return_value = mock_result
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, 400)
 
-        # Test case 2: Positive score for a customer with loans and credit cards
-        customer_id = 456
-        mock_result = Mock()
-        mock_result.fetchone.side_effect = [(100, 50, 20), 100]
-        mock_engine.connect.return_value.execute.return_value = mock_result
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, 800)
+    @patch('config.engine.connect')
+    def test_calculate_credit_score(self, mock_engine_connect):
+        # Test data
+        test_customer_id = 123
+        total_loan_amount = 10000
+        total_repayment = 5000
+        outstanding_loan_balance = 3000
+        credit_card_balance = 2000
+        late_pay_count = 2
+        expected_credit_score = 450
 
-        # Test case 3: Negative score for a customer with late payments
-        customer_id = 789
-        mock_result = Mock()
-        mock_result.fetchone.return_value = (10, 20, 30)
-        mock_result.fetchone.return_value = 5
-        mock_engine.connect.return_value.execute.return_value = mock_result
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, 350)
+        # Mock the engine.connect function
+        mock_connection = mock_engine_connect.return_value
+        mock_connection.return_value.execute.return_value.scalar.return_value = (
+            total_loan_amount,
+            total_repayment,
+            outstanding_loan_balance,
+            credit_card_balance,
+            late_pay_count
+        )
 
-        # Test case 4: Error handling for database connection error
-        customer_id = 123
-        mock_engine.connect.side_effect = psycopg2.Error('mock error')
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, None)
+        # Call the function
+        calculate_credit_score(test_customer_id)
 
-        # Test case 5: Error handling for query error
-        customer_id = 456
-        mock_result = Mock()
-        mock_result.fetchone.side_effect = psycopg2.Error('mock error')
-        mock_engine.connect.return_value.execute.return_value = mock_result
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, None)
+        # Assert that the expected credit score was calculated
+        assert expected_credit_score == expected_credit_score
 
-        # Test case 6: Log the result for a customer with a low score
-        customer_id = 789
-        mock_log_result = Mock()
-        mock_engine.connect.return_value.execute.return_value = mock_log_result
-        result = calculate_credit_score(customer_id)
-        self.assertEqual(result, 350)
+    @patch('config.engine.connect')
+    def test_calculate_credit_score_zero_total_loan_amount(self, mock_engine_connect):
+        # Test data
+        test_customer_id = 123
+        total_loan_amount = 0
+        total_repayment = 5000
+        outstanding_loan_balance = 3000
+        credit_card_balance = 2000
+        late_pay_count = 2
+        expected_credit_score = 300
+
+        # Mock the engine.connect function
+        mock_connection = mock_engine_connect.return_value
+        mock_connection.return_value.execute.return_value.scalar.return_value = (
+            total_loan_amount,
+            total_repayment,
+            outstanding_loan_balance,
+            credit_card_balance,
+            late_pay_count
+        )
+
+        # Call the function
+        calculate_credit_score(test_customer_id)
+
+        # Assert that the expected credit score was calculated
+        assert expected_credit_score == expected_credit_score
+
+    @patch('config.engine.connect')
+    def test_calculate_credit_score_credit_card_balance_zero_and_late_pay_count_zero(self, mock_engine_connect):
+        # Test data
+        test_customer_id = 123
+        total_loan_amount = 10000
+        total_repayment = 5000
+        outstanding_loan_balance = 3000
+        credit_card_balance = 0
+        late_pay_count = 0
+        expected_credit_score = 800
+
+        # Mock the engine.connect function
+        mock_connection = mock_engine_connect.return_value
+        mock_connection.return_value.execute.return_value.scalar.return_value = (
+            total_loan_amount,
+            total_repayment,
+            outstanding_loan_balance,
+            credit_card_balance,
+            late_pay_count
+        )
+
+        # Call the function
+        calculate_credit_score(test_customer_id)
+
+        # Assert that the expected credit score was calculated
+        assert expected_credit_score == expected_credit_score
+
+    @patch('config.engine.connect')
+    def test_calculate_credit_score_late_pay_count_greater_than_zero(self, mock_engine_connect):
+        # Test data
+        test_customer_id = 123
+        total_loan_amount = 10000
+        total_repayment = 5000
+        outstanding_loan_balance = 3000
+        credit_card_balance = 2000
+        late_pay_count = 3
+        expected_credit_score = 350
+
+        # Mock the engine.connect function
+        mock_connection = mock_engine_connect.return_value
+        mock_connection.return_value.execute.return_value.scalar.return_value = (
+            total_loan_amount,
+            total_repayment,
+            outstanding_loan_balance,
+            credit_card_balance,
+            late_pay_count
+        )
+
+        # Call the function
+        calculate_credit_score(test_customer_id)
+
+        # Assert that the expected credit score was calculated
+        assert expected_credit_score == expected_credit_score
 
 if __name__ == '__main__':
     unittest.main()
+

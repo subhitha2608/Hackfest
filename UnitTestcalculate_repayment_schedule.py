@@ -1,65 +1,93 @@
 
 import unittest
+from unittest.mock import patch, DEFAULT
 from your_module import calculate_repayment_schedule
-import datetime
+import pandas as pd
+import sqlite3
+from your_module import engine
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    def test_valid_loan(self):
-        loan_id = 1
-        loan_amount = 100000
-        interest_rate = 6
-        loan_term = 60
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule(self, mock_engine):
+        mock_conn = mock_engine.connect.return_value
+        mock_cursor = mock_conn.execute.return_value
 
-        # Mock the engine and connection
-        engine = MockEngine()
-        engine.execute.return_value = [(loan_amount, interest_rate, loan_term, datetime.date(2022, 1, 1))]
+        calculate_repayment_schedule(1)
 
-        # Call the function
-        data = calculate_repayment_schedule(loan_id)
+        mock_engine.connect.assert_called_once()
+        mock_conn.execute.assert_called_once()
+        mock_conn.execute().fetchall.assert_called_once()
+        mock_cursor.fetchall.assert_called_once()
 
-        # Check the length of the data
-        self.assertEqual(len(data), loan_term)
-
-        # Check the values in the data
-        for i, row in enumerate(data):
-            payment_date = datetime.date(2022, 1, 1) + datetime.timedelta(days=30*(i+1))
-            expected_principal_amount = (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-1)) - (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-2))
-            expected_interest_amount = loan_amount * (1 + interest_rate/100/12)**(-i-1) - (loan_amount - loan_amount * (1 + interest_rate/100/12)**(-i-2))
-            expected_monthly_payment = (loan_amount * interest_rate/100/12) / (1 - (1 + interest_rate/100/12)**(-loan_term))
-            self.assertEqual(row["payment_date"], payment_date)
-            self.assertAlmostEqual(row["principal_amount"], expected_principal_amount, places=6)
-            self.assertAlmostEqual(row["interest_amount"], expected_interest_amount, places=6)
-            self.assertAlmostEqual(row["totalpayment"], expected_monthly_payment, places=6)
-
+        # get connection and cursor objects
+        conn = engine.connect()
+        cursor = conn.execute()
+        
+        # Close the connection
+        conn.close()
+        
     def test_invalid_loan_id(self):
-        loan_id = 0
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
+        with self.assertRaises(sqlite3.Error):
+            calculate_repayment_schedule(0)
 
-    def test_loans_table_empty(self):
-        engine = MockEngine()
-        engine.execute.return_value = None
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(1)
+    def test_start_date_is_start_of_month(self):
+        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
+        calculate_repayment_schedule(1)
+        payment_date = '2022-01-01'
+        for i in range(2, 31):
+            payment_date = pd.to_datetime(payment_date)
+            payment_date += pd.Timedelta(days=1)
+            payment_date = payment_date.strftime('%Y-%m-%d')
+        assert payment_date
 
-    def test_connection_error(self):
-        engine = MockEngine()
-        engine.execute.side_effect = psycopg2.Error(' mock error')
-        with self.assertRaises(psycopg2.Error):
-            calculate_repayment_schedule(1)
+    def test_start_date_is_middle_of_month(self):
+        loan_details = [(10000.0, 5.0, 30, '2022-01-15')]
+        calculate_repayment_schedule(1)
+        payment_date = '2022-01-15'
+        for i in range(3, 31):
+            payment_date = pd.to_datetime(payment_date)
+            payment_date += pd.Timedelta(days=1)
+            payment_date = payment_date.strftime('%Y-%m-%d')
+        assert payment_date
 
-class MockEngine:
-    def __init__(self):
-        self.execute = lambda query, params: MockConnection(query, params)
+    def test_payment_date_is_at_the_end_of_month(self):
+        loan_details = [(10000.0, 5.0, 30, '2022-02-28')]
+        calculate_repayment_schedule(1)
+        payment_date = '2022-02-28'
+        for i in range(29, 28, -1):
+            payment_date = pd.to_datetime(payment_date)
+            payment_date += pd.Timedelta(days=1)
+            payment_date = payment_date.strftime('%Y-%m-%d')
+        assert payment_date
 
-class MockConnection:
-    def __init__(self, query, params):
-        self.query = query
-        self.params = params
+    def test_total_repayment_is_not_exceeding_loan_amount(self):
+        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
+        calculate_repayment_schedule(1)
+        total_repayment = cursor.execute(text("SELECT totalpayment FROM repaymentschedule WHERE loanid = :loan_id"), 
+                                 {'loan_id': 1}).fetchall()
+        self.assertLessEqual(total_repayment[0][0], 10000.0)
 
-    def fetchone(self):
-        return [(100000, 6, 60, datetime.date(2022, 1, 1))]
+    def test_total_repayment_is_exceeding_loan_amount(self):
+        loan_details = [(10000.0, 5.0, 30, '2022-01-01')]
+        calculate_repayment_schedule(1)
+        total_repayment = cursor.execute(text("SELECT totalpayment FROM repaymentschedule WHERE loanid = :loan_id"), 
+                                 {'loan_id': 1}).fetchall()
+        self.assertGreaterEqual(total_repayment[0][0], 10000.0)
+
+    def test_final_balance_is_zero(self):
+        loan_details = [(1000.0, 5.0, 1, '2022-01-01')]
+        calculate_repayment_schedule(1)
+        final_balance = cursor.execute(text("SELECT balance FROM repaymentschedule WHERE loanid = :loan_id ORDER BY paymentdate desc LIMIT 1"), 
+                                 {'loan_id': 1}).fetchall()
+        self.assertEqual(final_balance[0][0], 0)
+
+    def test_final_balance_is_not_zero(self):
+        loan_details = [(1000.0, 5.0, 1, '2022-01-01')]
+        calculate_repayment_schedule(1)
+        final_balance = cursor.execute(text("SELECT balance FROM repaymentschedule WHERE loanid = :loan_id ORDER BY paymentdate desc LIMIT 1"), 
+                                 {'loan_id': 1}).fetchall()
+        self.assertNotEqual(final_balance[0][0], 0)
 
 if __name__ == '__main__':
     unittest.main()

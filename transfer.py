@@ -1,28 +1,33 @@
-
+Python
 from config import engine
-import pandas as pd
 from sqlalchemy import text
+import pandas as pd
+import psycopg2
 
-def transfer_funds(sender_id, receiver_id, amount):
-    # Subtract the amount from the sender's account
-    sender_query = text("""
-        UPDATE accounts
-        SET balance = balance - :amount
-        WHERE id = :sender_id
-    """)
-    result = engine.execute(sender_query, {'sender_id': sender_id, 'amount': amount})
-    sender_result = result.fetchall()
+def transfer_funds(p_sender, p_receiver, p_amount):
+    conn = engine.connect()
 
-    # Add the amount to the receiver's account
-    receiver_query = text("""
-        UPDATE accounts
-        SET balance = balance + :amount
-        WHERE id = :receiver_id
-    """)
-    result = engine.execute(receiver_query, {'receiver_id': receiver_id, 'amount': amount})
-    receiver_result = result.fetchall()
+    try:
+        # Subtract the amount from the sender's account
+        cur = conn.execute(text("""
+            UPDATE accounts 
+            SET balance = balance - :p_amount 
+            WHERE id = :p_sender
+        """), {"p_sender": p_sender, "p_amount": p_amount})
 
-    # Commit the changes
-    engine.execute("commit")
+        # Add the amount to the receiver's account
+        cur = conn.execute(text("""
+            UPDATE accounts 
+            SET balance = balance + :p_amount 
+            WHERE id = :p_receiver
+        """), {"p_receiver": p_receiver, "p_amount": p_amount})
 
-    return sender_result, receiver_result
+        conn.commit()
+        return "Funds transfer successful."
+    except (Exception, psycopg2.DatabaseError) as error:
+        print(error)
+        conn.rollback()
+        return "Funds transfer failed."
+
+# Testing the function
+print(transfer_funds(1, 2, 100))

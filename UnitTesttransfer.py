@@ -1,69 +1,40 @@
-Python
+
 import unittest
-from unittest.mock import patch, Mock
-from config import engine
-import pandas as pd
-from sqlalchemy import text
-import psycopg2
+from your_module import transfer_funds  # import the function from your module
 
-class TestTransaction(unittest.TestCase):
+class TestTransferFunds(unittest.TestCase):
 
-    @patch('config.engine.connect')
-    def test_transaction_success(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 100.0}, {"id": 2, "balance": 100.0}]
-        mock_connect.return_value.close.return_value = None
-        result.execute.return_value.rowcount = 2
-        result.close.return_value = None
-        
-        tester = transaction(1, 2, 100.0)
-        self.assertEqual(tester, [{"id": 1, "balance": 100.0}, {"id": 2, "balance": 100.0}])
-        
-    @patch('config.engine.connect')
-    def test_transaction_error(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.side_effect = psycopg2.Error('Database error')
-        mock_connect.return_value.close.return_value = None
-        with self.assertRaises(psycopg2.Error):
-            transaction(1, 2, 100.0)
-        
-    @patch('config.engine.connect')
-    def test_transaction_zero_sent(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}]
-        mock_connect.return_value.close.return_value = None
-        result.execute.return_value.rowcount = 2
-        result.close.return_value = None
-        
-        tester = transaction(1, 2, 1000.0)
-        self.assertEqual(tester, [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}])
-        
-    @patch('config.engine.connect')
-    def test_transaction_zero_recieved(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.side_effect = psycopg2.Error('Database error')
-        mock_connect.return_value.close.return_value = None
-        with self.assertRaises(psycopg2.Error):
-            transaction(1, 2, -100.0)
-        
-    @patch('config.engine.connect')
-    def test_transaction_large_amount(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.return_value = Mock.fetchall.return_value = [{"id": 1, "balance": 1000.0}, {"id": 2, "balance": 1000.0}]
-        mock_connect.return_value.close.return_value = None
-        result.execute.return_value.rowcount = 2
-        result.close.return_value = None
-        
-        tester = transaction(1, 2, 10000.0)
-        self.assertEqual(tester, [{"id": 1, "balance": 0.0}, {"id": 2, "balance": 10000.0}])
-        
-    @patch('config.engine.connect')
-    def test_transaction_negative_amount(self, mock_connect):
-        result = mock_connect.return_value
-        result.execute.side_effect = psycopg2.Error('Database error')
-        mock_connect.return_value.close.return_value = None
-        with self.assertRaises(psycopg2.Error):
-            transaction(1, 2, -10.0)
+    def test_transfer_funds_successful(self):
+        with self.assertLogs(level='INFO') as cm:
+            result = transfer_funds(1, 2, 100)
+            self.assertEqual(result, "Funds transfer successful.")
+            self.assertEqual(len(cm.records), 1)
+
+    def test_transfer_funds_failed_due_to_query_error(self):
+        with self.assertLogs(level='ERROR') as cm:
+            with unittest.mock.patch('your_module.engine.connect', side_effect=psycopg2.Error):
+                result = transfer_funds(1, 2, 100)
+                self.assertEqual(result, "Funds transfer failed.")
+                self.assertEqual(len(cm.records), 1)
+
+    def test_transfer_funds_failed_due_to_invalid_account_id(self):
+        with self.assertLogs(level='INFO') as cm:
+            result = transfer_funds(123456, 2, 100)
+            self.assertEqual(result, "Funds transfer failed.")
+            self.assertEqual(len(cm.records), 1)
+
+    def test_transfer_funds_failed_due_to_negative_amount(self):
+        with self.assertLogs(level='INFO') as cm:
+            result = transfer_funds(1, 2, -100)
+            self.assertEqual(result, "Funds transfer failed.")
+            self.assertEqual(len(cm.records), 1)
+
+    def test_transfer_funds_failed_due_to_receiving_account_with_zero_balance(self):
+        with self.assertLogs(level='INFO') as cm:
+            result = transfer_funds(1, 2, 1000)
+            self.assertEqual(result, "Funds transfer failed.")
+            self.assertEqual(len(cm.records), 1)
+
 
 if __name__ == '__main__':
     unittest.main()
