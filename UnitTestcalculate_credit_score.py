@@ -1,22 +1,30 @@
 
 import unittest
-from calculate_credit_score import calculate_credit_score
 
 class TestCalculateCreditScore(unittest.TestCase):
-    def test_calculate_credit_score customerId1(self):
-        customer_id = 1
+    def testcalculate_credit_score(self):
+        customer_id = 1  # Replace with an existing customer ID
+        expected_credit_score = 750  # Replace with the expected credit score for this customer
         result = calculate_credit_score(customer_id)
-        self.assertEquals(result, 650)  # Replace with expected result for customer_id 1
+        self.assertEquals(result, expected_credit_score)
 
-    def test_calculate_credit_score_customerId2(self):
-        customer_id = 2
+    def test_no_loans(self):
+        customer_id = 2  # Replace with a customer ID with no loans
+        expected_credit_score = 700  # Replace with the expected credit score for this customer
         result = calculate_credit_score(customer_id)
-        self.assertEquals(result, 700)  # Replace with expected result for customer_id 2
+        self.assertEquals(result, expected_credit_score)
 
-    def test_calculate_credit_score_customerId3(self):
-        customer_id = 3
+    def test_late_payments(self):
+        customer_id = 3  # Replace with a customer ID with late payments
+        expected_credit_score = 550  # Replace with the expected credit score for this customer
         result = calculate_credit_score(customer_id)
-        self.assertEquals(result, 550)  # Replace with expected result for customer_id 3
+        self.assertEquals(result, expected_credit_score)
+
+    def test_credit_card_balance(self):
+        customer_id = 4  # Replace with a customer ID with a high credit card balance
+        expected_credit_score = 400  # Replace with the expected credit score for this customer
+        result = calculate_credit_score(customer_id)
+        self.assertEquals(result, expected_credit_score)
 
 if __name__ == '__main__':
     unittest.main()
