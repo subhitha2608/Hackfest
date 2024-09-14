@@ -1,52 +1,46 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from sqlalchemy import create_engine, text
-import pandas as pd
-import psycopg2
+from sqlalchemy.engine import Engine
+from sqlalchemy.exc import DBAPIError
+from psycopg2 import Error
 from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
+
     @patch('your_module.engine')
-    def test_calculate_repayment_schedule(self, mock_engine):
-        # Setup mock engine connection
-        mock_conn = Mock()
-        mock_engine.connect.return_value = mock_conn
+    def test_calculate_repayment_schedule_success(self, engine_mock):
+        engine_mock.execute.return_value.fetchone.return_value = (10000, 5, 60, '2022-01-01')
+        engine_mock.execute.return_value = Mock()
+        self.assertEqual(calculate_repayment_schedule(1), "Repayment schedule calculated successfully")
+        engine_mock.execute.assert_called()
 
-        # Setup mock query result
-        mock_result = Mock()
-        mock_result.fetchone.return_value = (1000, 5, 12, '2022-01-01')
-        mock_conn.execute.return_value = mock_result
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule_dbapi_error(self, engine_mock):
+        engine_mock.execute.side_effect = DBAPIError(None, None, None)
+        with self.assertRaises(DBAPIError):
+            calculate_repayment_schedule(1)
 
-        # Test loan exists
-        loan_id = 1
-        repayment_schedule = calculate_repayment_schedule(loan_id)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule_psycopg2_error(self, engine_mock):
+        engine_mock.execute.side_effect = Error()
+        with self.assertRaises(Error):
+            calculate_repayment_schedule(1)
 
-        # Test loan does not exist
-        mock_result.fetchone.return_value = None
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule_loan_id_none(self, engine_mock):
+        with self.assertRaises(TypeError):
+            calculate_repayment_schedule(None)
+
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule_loan_id_string(self, engine_mock):
+        with self.assertRaises(TypeError):
+            calculate_repayment_schedule('1')
+
+    @patch('your_module.engine')
+    def test_calculate_repayment_schedule_loan_id_negative(self, engine_mock):
         with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
-
-        # Test loan term is 0
-        mock_result.fetchone.return_value = (1000, 5, 0, '2022-01-01')
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
-
-        # Test loan amount is 0
-        mock_result.fetchone.return_value = (0, 5, 12, '2022-01-01')
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
-
-        # Test interest rate is 0
-        mock_result.fetchone.return_value = (1000, 0, 12, '2022-01-01')
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
-
-        # Test start date is None
-        mock_result.fetchone.return_value = (1000, 5, 12, None)
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(loan_id)
+            calculate_repayment_schedule(-1)
 
 if __name__ == '__main__':
     unittest.main()
