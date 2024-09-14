@@ -1,43 +1,25 @@
 
 import unittest
-from your_module import calculate_credit_score  # Replace 'your_module' with the actual module name
+from your_module import calculate_credit_score  # Replace with the actual module name
 
 class TestCalculateCreditScore(unittest.TestCase):
-    def setUp(self):
-        # Create a test database connection or setup a test environment
-        pass
-
-    def tearDown(self):
-        # Close the test database connection or cleanup the test environment
-        pass
-
     def test_calculate_credit_score(self):
-        customer_id = 1  # Replace with a valid customer ID
+        # Test with a customer who has loans, credit cards, and late payments
+        customer_id = 1
         credit_score = calculate_credit_score(customer_id)
-        self.assertIsInstance(credit_score, int)
-        self.assertGreaterEqual(credit_score, 300)
-        self.assertLessEqual(credit_score, 850)
+        self.assertEqual(credit_score, 650)
 
-    def test_calculate_credit_score_zero_loan_amount(self):
-        customer_id = 2  # Replace with a customer ID with zero loan amount
+    def test_calculate_credit_score_no_loans(self):
+        # Test with a customer who has no loans
+        customer_id = 2
         credit_score = calculate_credit_score(customer_id)
-        self.assertIsInstance(credit_score, int)
-        self.assertGreaterEqual(credit_score, 300)
-        self.assertLessEqual(credit_score, 850)
+        self.assertEqual(credit_score, 700)
 
-    def test_calculate_credit_score_high_credit_card_balance(self):
-        customer_id = 3  # Replace with a customer ID with high credit card balance
+    def test_calculate_credit_score_no_credit_cards(self):
+        # Test with a customer who has no credit cards
+        customer_id = 3
         credit_score = calculate_credit_score(customer_id)
-        self.assertIsInstance(credit_score, int)
-        self.assertGreaterEqual(credit_score, 300)
-        self.assertLessEqual(credit_score, 850)
-
-    def test_calculate_credit_score_late_payments(self):
-        customer_id = 4  # Replace with a customer ID with late payments
-        credit_score = calculate_credit_score(customer_id)
-        self.assertIsInstance(credit_score, int)
-        self.assertGreaterEqual(credit_score, 300)
-        self.assertLessEqual(credit_score, 850)
+        self.assertEqual(credit_score, 750)
 
 if __name__ == '__main__':
     unittest.main()

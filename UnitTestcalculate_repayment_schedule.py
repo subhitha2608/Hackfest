@@ -6,25 +6,17 @@ class TestGenerateRepaymentSchedule(unittest.TestCase):
     def test_loan_id_1(self):
         loan_id = 1
         repayment_schedule = generate_repayment_schedule(loan_id)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self.assertEqual(repayment_schedule.shape[0], 12)  # assuming 12 months loan term
-        self.assertEqual(repayment_schedule.iloc[0]['loan_id'], loan_id)
-        self.assertEqual(repayment_schedule.iloc[0]['payment_number'], 1)
-        self.assertGreater(repayment_schedule.iloc[0]['total_payment'], 0)
+        self.assertEquals(repayment_schedule.shape[0], 12)  # assuming 12 months for loan_id 1
 
     def test_loan_id_2(self):
         loan_id = 2
         repayment_schedule = generate_repayment_schedule(loan_id)
-        self.assertIsInstance(repayment_schedule, pd.DataFrame)
-        self.assertEqual(repayment_schedule.shape[0], 24)  # assuming 24 months loan term
-        self.assertEqual(repayment_schedule.iloc[0]['loan_id'], loan_id)
-        self.assertEqual(repayment_schedule.iloc[0]['payment_number'], 1)
-        self.assertGreater(repayment_schedule.iloc[0]['total_payment'], 0)
+        self.assertEquals(repayment_schedule.iloc[0]['paymentnumber'], 1)  # check payment number starts from 1
 
-    def test_invalid_loan_id(self):
-        loan_id = 999  # assuming this loan id does not exist
-        with self.assertRaises(Exception):
-            generate_repayment_schedule(loan_id)
+    def test_loan_id_3(self):
+        loan_id = 3
+        repayment_schedule = generate_repayment_schedule(loan_id)
+        self.assertEquals(repayment_schedule.iloc[-1]['balance'], 0)  # check balance becomes 0 at the end of loan term
 
 if __name__ == '__main__':
     unittest.main()

@@ -1,6 +1,6 @@
 
 from config import engine
-from sqlalchemy import text
+import sqlalchemy as sa
 import pandas as pd
 import psycopg2
 
@@ -8,14 +8,14 @@ def generate_repayment_schedule(loan_id):
     conn = engine.connect()
 
     # Get loan details
-    query = text("""
+    query = sa.text("""
         SELECT loanamount, interestrate, loanterm, startdate
         FROM loans
         WHERE loanid = :loan_id
     """)
-    result = conn.execute(query, {"loan_id": loan_id})
-    loan_details = result.fetchone()
-    loan_amount, interest_rate, loan_term, start_date = loan_details
+    result = conn.execute(query, {'loan_id': loan_id})
+    row = result.fetchone()
+    loan_amount, interest_rate, loan_term, start_date = row
 
     # Convert annual interest rate to monthly interest rate (divide by 12)
     monthly_interest_rate = interest_rate / 100 / 12
@@ -29,11 +29,8 @@ def generate_repayment_schedule(loan_id):
     # Initialize payment_date to the start date of the loan
     payment_date = start_date
 
-    # Initialize payment_number
+    # Initialize payment number
     payment_number = 1
-
-    # Create a list to store repayment schedule
-    repayment_schedule = []
 
     # Loop through each month and calculate the repayment schedule
     while payment_number <= loan_term:
@@ -46,39 +43,30 @@ def generate_repayment_schedule(loan_id):
         # Deduct principal from balance
         balance -= principal_amount
 
-        # Create a dictionary to store repayment details
-        repayment_details = {
-            "loan_id": loan_id,
-            "payment_number": payment_number,
-            "payment_date": payment_date,
-            "principal_amount": principal_amount,
-            "interest_amount": interest_amount,
-            "total_payment": monthly_payment,
-            "balance": balance
-        }
-
-        # Append repayment details to the list
-        repayment_schedule.append(repayment_details)
+        # Insert repayment details into the RepaymentSchedule table
+        query = sa.text("""
+            INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
+            VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
+        """)
+        conn.execute(query, {
+            'loan_id': loan_id,
+            'payment_number': payment_number,
+            'payment_date': payment_date,
+            'principal_amount': principal_amount,
+            'interest_amount': interest_amount,
+            'monthly_payment': monthly_payment,
+            'balance': balance
+        })
 
         # Move to the next month
-        payment_date += pd.DateOffset(months=1)
+        payment_date += pd.Timedelta('1 month')
         payment_number += 1
-
-    # Insert repayment details into the RepaymentSchedule table
-    query = text("""
-        INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-        VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :total_payment, :balance)
-    """)
-    for repayment_details in repayment_schedule:
-        conn.execute(query, repayment_details)
 
     # Commit changes
     conn.commit()
 
     # Return the repayment schedule
-    return pd.DataFrame(repayment_schedule)
-
-# Example usage
-loan_id = 1
-repayment_schedule = generate_repayment_schedule(loan_id)
-print(repayment_schedule)
+    query = sa.text("SELECT * FROM repaymentschedule WHERE loanid = :loan_id")
+    result = conn.execute(query, {'loan_id': loan_id})
+    repayment_schedule = pd.DataFrame(result.fetchall(), columns=[desc[0] for desc in result.description])
+    return repayment_schedule
