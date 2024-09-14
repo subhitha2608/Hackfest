@@ -1,61 +1,107 @@
 
 import unittest
-from datetime import datetime, timedelta
-from decimal import Decimal
+from unittest.mock import patch, Mock
+from datetime import date, timedelta
+from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    def setUp(self):
-        self.engine = engine
-        self.loan_id = 1
+    @patch('your_module.engine.connect')
+    @patch('your_module.text')
+    @patch('your_module.pd.Timedelta')
+    def test_calculate_repayment_schedule(self, mock_pandas_timedelta, mock_text, mock_connect):
+        # Mock the database connection
+        conn = Mock()
+        mock_connect.return_value = conn
 
-    def test_calculate_repayment_schedule(self):
-        calculate_repayment_schedule(self.loan_id)
+        # Mock the query execution
+        query = Mock()
+        mock_text.return_value = query
 
-    def test_loan_amount_missing(self):
-        with self.assertRaises/IndexError:
-            loan_amount = pd.read_sql_query(text("SELECT loanamount FROM loans WHERE loanid = :loan_id"), self.engine, params={'loan_id': self.loan_id}).iloc[0]['loanamount']
-            calculate_repayment_schedule(self.loan_id)
+        # Mock the fetchone method
+        result = Mock()
+        result.fetchone.return_value = (1000, 5, 60, date(2022, 1, 1))
+        query.execute.return_value = result
 
-    def test_interest_rate_zero(self):
-        start_date = datetime.now()
-        loan_amount = Decimal(1000.0)
-        interest_rate = Decimal(0.0)
-        loan_term = 12
-        calculate_repayment_schedule(self.loan_id)
-        self.assertEqual(len(pd.read_sql_query(text("SELECT * FROM repaymentschedule WHERE loanid = :loan_id"), self.engine, params={'loan_id': self.loan_id})), loan_term)
-        self.assertEqual(loan_amount, Decimal(0.0))
+        # Mock the pandas datetime.timedelta
+        mock_pandas_timedelta.return_value = timedelta(days=30)
 
-    def test_loan_term_zero(self):
-        loan_amount = Decimal(1000.0)
-        interest_rate = Decimal(5.0)
-        start_date = datetime.now()
-        loan_term = 0
-        with self.assertRaises(IndexError):
-            calculate_repayment_schedule(self.loan_id)
+        # Call the function
+        result = calculate_repayment_schedule(1)
 
-    def test_start_date_missing(self):
-        loan_amount = Decimal(1000.0)
-        interest_rate = Decimal(5.0)
-        loan_term = 12
-        with self.assertRaises(IndexError):
-            calculate_repayment_schedule(self.loan_id)
+        # Verify that the function was called correctly
+        self.assertEqual(result, 0)
+        mock_text.assert_called_once()
+        query.execute.assert_called_once()
+        conn.commit.assert_called_once()
 
-    def test_invalid_loan_term(self):
-        start_date = datetime.now()
-        loan_amount = Decimal(1000.0)
-        interest_rate = Decimal(5.0)
-        loan_term = -1
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(self.loan_id)
+    @patch('your_module.engine.connect')
+    @patch('your_module.text')
+    @patch('your_module.pd.Timedelta')
+    def test_calculate_repayment_schedule_no_loan_found(self, mock_pandas_timedelta, mock_text, mock_connect):
+        # Mock the database connection
+        conn = Mock()
+        mock_connect.return_value = conn
 
-    def test_invalid_interest_rate(self):
-        start_date = datetime.now()
-        loan_amount = Decimal(1000.0)
-        interest_rate = -1
-        loan_term = 12
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(self.loan_id)
+        # Mock the query execution
+        query = Mock()
+        mock_text.return_value = query
+
+        # Mock the fetchone method
+        result = None
+        query.execute.return_value = result
+        conn.execute.side_effect = Exception()
+
+        # Mock the pandas datetime.timedelta
+        mock_pandas_timedelta.return_value = timedelta(days=30)
+
+        # Call the function
+        self.assertRaises(Exception, calculate_repayment_schedule, 1)
+
+    @patch('your_module.engine.connect')
+    @patch('your_module.text')
+    @patch('your_module.pd.Timedelta')
+    def test_calculate_repayment_schedule_invalid_loan_id(self, mock_pandas_timedelta, mock_text, mock_connect):
+        # Mock the database connection
+        conn = Mock()
+        mock_connect.return_value = conn
+
+        # Mock the query execution
+        query = Mock()
+        mock_text.return_value = query
+
+        # Mock the fetchone method
+        result = None
+        query.execute.return_value = result
+
+        # Mock the pandas datetime.timedelta
+        mock_pandas_timedelta.return_value = timedelta(days=30)
+
+        # Call the function
+        self.assertRaises(Exception, calculate_repayment_schedule, 0)
+
+    @patch('your_module.engine.connect')
+    @patch('your_module.text')
+    @patch('your_module.pd.Timedelta')
+    def test_calculate_repayment_schedule_invalid_loan_details(self, mock_pandas_timedelta, mock_text, mock_connect):
+        # Mock the database connection
+        conn = Mock()
+        mock_connect.return_value = conn
+
+        # Mock the query execution
+        query = Mock()
+        mock_text.return_value = query
+
+        # Mock the fetchone method
+        result = Mock()
+        result.fetchone.return_value = (0, 1, 1, date(2022, 1, 1))
+        query.execute.return_value = result
+
+        # Mock the pandas datetime.timedelta
+        mock_pandas_timedelta.return_value = timedelta(days=30)
+
+        # Call the function
+        self.assertRaises(Exception, calculate_repayment_schedule, 1)
 
 if __name__ == '__main__':
     unittest.main()
