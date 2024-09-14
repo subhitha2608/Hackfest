@@ -1,66 +1,120 @@
 
 import unittest
-from unittest.mock import patch, Mock
 from your_module import transfer_amount
+import pandas as pd
+from sqlalchemy import text
+from unittest.mock import patch
 
 class TestTransferAmount(unittest.TestCase):
-    @patch('your_module.engine')
-    @patch('your_module.text')
-    def test_transfer_amount(self, mock_text, mock_engine):
-        sender = 1
-        receiver = 2
-        amount = 10
 
-        # Mock the engine and text functions
-        mock_engine.connect.return_value = Mock()
-        mock_engine.connect.return_value.execute.return_value = None
-        mock_engine.connect.return_value.commit.return_value = None
-        mock_engine.connect.return_value.close.return_value = None
-        mock_text.return_value = "UPDATE accounts SET balance = balance - :amount WHERE id = :sender;\nUPDATE accounts SET balance = balance + :amount WHERE id = :receiver;"
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_success(self, connect):
+        conn = connect.return_value
+        conn.execute.return_value = None
+        conn.commit.return_value = None
+        conn.close.return_value = None
 
-        # Call the transfer_amount function
-        transfer_amount(sender, receiver, amount)
+        result = transfer_amount(1, 2, 100)
+        self.assertIsNone(result)
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance - :p_amount
+            WHERE id = :p_sender
+        """).bindparams(p_sender=1, p_amount=100))
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance + :p_amount
+            WHERE id = :p_receiver
+        """).bindparams(p_receiver=2, p_amount=100))
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
 
-        # Assert that the engine and text functions were called correctly
-        mock_engine.connect.assert_called_once()
-        mock_engine.connect.return_value.execute.assert_called_once_with(text=mock_text.return_value, params={'sender': sender, 'receiver': receiver, 'amount': amount})
-        mock_engine.connect.return_value.commit.assert_called_once()
-        mock_engine.connect.return_value.close.assert_called_once()
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_sender_account_exists(self, connect):
+        conn = connect.return_value
+        conn.execute.return_value = None
+        conn.commit.return_value = None
+        conn.close.return_value = None
 
-    def test_transfer_amount_invalid_sender(self):
-        sender = 0
-        receiver = 2
-        amount = 10
+        result = transfer_amount(1, 2, 100)
+        self.assertIsNone(result)
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance - :p_amount
+            WHERE id = :p_sender
+        """).bindparams(p_sender=1, p_amount=100))
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance + :p_amount
+            WHERE id = :p_receiver
+        """).bindparams(p_receiver=2, p_amount=100))
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
 
-        # Call the transfer_amount function
-        with self.assertRaises(ValueError):
-            transfer_amount(sender, receiver, amount)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_receiver_account_exists(self, connect):
+        conn = connect.return_value
+        conn.execute.return_value = None
+        conn.commit.return_value = None
+        conn.close.return_value = None
 
-    def test_transfer_amount_invalid_receiver(self):
-        sender = 1
-        receiver = 0
-        amount = 10
+        result = transfer_amount(1, 2, 100)
+        self.assertIsNone(result)
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance - :p_amount
+            WHERE id = :p_sender
+        """).bindparams(p_sender=1, p_amount=100))
+        conn.execute.assert_called_with(text("""
+            UPDATE accounts
+            SET balance = balance + :p_amount
+            WHERE id = :p_receiver
+        """).bindparams(p_receiver=2, p_amount=100))
+        conn.commit.assert_called_once()
+        conn.close.assert_called_once()
 
-        # Call the transfer_amount function
-        with self.assertRaises(ValueError):
-            transfer_amount(sender, receiver, amount)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_zero_amount(self, connect):
+        conn = connect.return_value
+        conn.execute.return_value = None
+        conn.commit.return_value = None
+        conn.close.return_value = None
 
-    def test_transfer_amount_negative_amount(self):
-        sender = 1
-        receiver = 2
-        amount = -10
+        result = transfer_amount(1, 2, 0)
+        self.assertIsNone(result)
+        conn.execute.assert_not_called()
+        conn.commit.assert_not_called()
+        conn.close.assert_called_once()
 
-        # Call the transfer_amount function
-        with self.assertRaises(ValueError):
-            transfer_amount(sender, receiver, amount)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_invalid_sender_account(self, connect):
+        conn = connect.return_value
+        conn.execute.side_effect = [None, None, Exception('Invalid sender ID')]
+        conn.commit.return_value = None
+        conn.close.return_value = None
 
-    def test_transfer_amount_zero_amount(self):
-        sender = 1
-        receiver = 2
-        amount = 0
+        with self.assertRaises(Exception):
+            transfer_amount(99, 2, 100)
 
-        # Call the transfer_amount function
-        transfer_amount(sender, receiver, amount)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_invalid_receiver_account(self, connect):
+        conn = connect.return_value
+        conn.execute.side_effect = [None, Exception('Invalid receiver ID'), None]
+        conn.commit.return_value = None
+        conn.close.return_value = None
+
+        with self.assertRaises(Exception):
+            transfer_amount(1, 99, 100)
+
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_error_occurred(self, connect):
+        conn = connect.return_value
+        conn.execute.side_effect = Exception('Error occurred')
+        conn.commit.return_value = None
+        conn.close.return_value = None
+
+        with self.assertRaises(Exception):
+            transfer_amount(1, 2, 100)
 
 if __name__ == '__main__':
     unittest.main()

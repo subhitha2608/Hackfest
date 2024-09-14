@@ -1,51 +1,59 @@
-
+Python
 import unittest
-from your_script import calculate_credit_score  # import your function
+from config import engine
+import pandas as pd
+from your_module import calculate_credit_score
 
 class TestCalculateCreditScore(unittest.TestCase):
 
-    def test_calculate_credit_score_valid_input(self):
-        result = calculate_credit_score(1)
-        self claim >= 300 and <= 850
+    def setUp(self):
+        self.customer_id = 1
+        self.total_loan_amount = 10000
+        self.total_repayment = 5000
+        self.outstanding_loan_balance = 3000
+        self.credit_card_balance = 5000
+        self.late_pay_count = 2
 
-    def test_calculate_credit_score_zero_total_loan_amount(self):
-        result = calculate_credit_score(2)
-        self claim 400
+        engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)", (self.customer_id, self.total_loan_amount, self.total_repayment, self.outstanding_loan_balance))
+        engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)", (self.customer_id, self.credit_card_balance))
+        engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')", self.customer_id)
+        engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')", self.customer_id)
 
-    def test_calculate_credit_score_positive_total_loan_amount_and_zero_repaid(self):
-        result = calculate_credit_score(3)
-        self claim 400
+    def test_calculate_credit_score(self):
+        calculate_credit_score(self.customer_id)
+        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
+        self.assertIsNotNone(result)
+        self.assertGreaterEqual(float(result[0]), 300)
+        self.assertLessEqual(float(result[0]), 850)
 
-    def test_calculate_credit_score_positive_total_loan_amount_and_some_repaid(self):
-        result = calculate_credit_score(4)
-        self claim 400 <= x < 850
+    def test_calculate_credit_score_no_loans(self):
+        engine.execute("DELETE FROM loans WHERE customer_id = %s", self.customer_id)
+        calculate_credit_score(self.customer_id)
+        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
+        self.assertIsNotNone(result)
+        self.assertEqual(float(result[0]), 700)
 
-    def test_calculate_credit_score_zero_credit_card_balance(self):
-        result = calculate_credit_score(5)
-        self claim 300
+    def test_calculate_credit_score_zero_balances(self):
+        engine.execute("UPDATE loans SET loan_amount = 0 WHERE customer_id = %s", self.customer_id)
+        engine.execute("UPDATE credit_cards SET balance = 0 WHERE customer_id = %s", self.customer_id)
+        calculate_credit_score(self.customer_id)
+        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
+        self.assertIsNotNone(result)
+        self.assertEqual(float(result[0]), 700)
 
-    def test_calculate_credit_score_positive_credit_card_balance_and_zero_balance(self):
-        result = calculate_credit_score(6)
-        self claim 300
+    def test_calculate_credit_score_low_score(self):
+        engine.execute("UPDATE credits SET credit_score = 2000 WHERE id = %s", self.customer_id)
+        calculate_credit_score(self.customer_id)
+        result = engine.execute("SELECT credit_score FROM customers WHERE id = %s", self.customer_id).fetchone()
+        self.assertIsNotNone(result)
+        self.assertEqual(float(result[0]), 500)
 
-    def test_calculate_credit_score_positive_credit_card_balance_and_some_balance(self):
-        result = calculate_credit_score(7)
-        self claim 300 <= x < 850
+    def tearDown(self):
+        engine.execute("DELETE FROM loans WHERE customer_id = %s", self.customer_id)
+        engine.execute("DELETE FROM credit_cards WHERE customer_id = %s", self.customer_id)
+        engine.execute("DELETE FROM payments WHERE customer_id = %s", self.customer_id)
+        engine.execute("DELETE FROM customers WHERE id = %s", self.customer_id)
 
-    def test_calculate_credit_score_zero_late_pay_count(self):
-        result = calculate_credit_score(8)
-        self claim >= 300 and <= 850
-
-    def test_calculate_credit_score_nonzero_late_pay_count(self):
-        result = calculate_credit_score(9)
-        self claim >= 300 and <= 850
-
-    def test_calculate_credit_score_alert_log(self):
-        result = calculate_credit_score(10)
-        self claim < 500 and any row['credit_score'] == 400 in engine.execute(text("""
-            SELECT * FROM credit_score_alerts WHERE customer_id = 10
-        """)).fetchall()
 
 if __name__ == '__main__':
     unittest.main()
-
