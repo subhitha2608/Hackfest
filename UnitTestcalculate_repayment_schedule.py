@@ -1,107 +1,165 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from datetime import date, timedelta
-from your_module import calculate_repayment_schedule
+from unittest.mock import Mock, patch
+from your_module import loan_repayment_schedule  # Import the function you want to test
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestLoanRepaymentSchedule(unittest.TestCase):
 
-    @patch('your_module.engine.connect')
-    @patch('your_module.text')
-    @patch('your_module.pd.Timedelta')
-    def test_calculate_repayment_schedule(self, mock_pandas_timedelta, mock_text, mock_connect):
-        # Mock the database connection
-        conn = Mock()
-        mock_connect.return_value = conn
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1
+        expected_df = pd.DataFrame({
+            "Payment Number": [1],
+            "Payment Date": ["2022-01-01"],
+            "Principal Amount": [100],
+            "Interest Amount": [10],
+            "Total Payment": [110],
+            "Balance": [900]
+        })
 
-        # Mock the query execution
-        query = Mock()
-        mock_text.return_value = query
-
-        # Mock the fetchone method
-        result = Mock()
-        result.fetchone.return_value = (1000, 5, 60, date(2022, 1, 1))
-        query.execute.return_value = result
-
-        # Mock the pandas datetime.timedelta
-        mock_pandas_timedelta.return_value = timedelta(days=30)
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 10, 12, "2022-01-01")
+        mock_engine.execute.return_value = mock_result
 
         # Call the function
-        result = calculate_repayment_schedule(1)
+        result = loan_repayment_schedule(loan_id)
 
-        # Verify that the function was called correctly
-        self.assertEqual(result, 0)
-        mock_text.assert_called_once()
-        query.execute.assert_called_once()
-        conn.commit.assert_called_once()
+        # Assert
+        self.assertEqual(result.equals(expected_df), True)
 
-    @patch('your_module.engine.connect')
-    @patch('your_module.text')
-    @patch('your_module.pd.Timedelta')
-    def test_calculate_repayment_schedule_no_loan_found(self, mock_pandas_timedelta, mock_text, mock_connect):
-        # Mock the database connection
-        conn = Mock()
-        mock_connect.return_value = conn
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_invalid_loan_id(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1000
 
-        # Mock the query execution
-        query = Mock()
-        mock_text.return_value = query
-
-        # Mock the fetchone method
-        result = None
-        query.execute.return_value = result
-        conn.execute.side_effect = Exception()
-
-        # Mock the pandas datetime.timedelta
-        mock_pandas_timedelta.return_value = timedelta(days=30)
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = None
+        mock_engine.execute.return_value = mock_result
 
         # Call the function
-        self.assertRaises(Exception, calculate_repayment_schedule, 1)
+        with self.assertRaises(KeyError):
+            loan_repayment_schedule(loan_id)
 
-    @patch('your_module.engine.connect')
-    @patch('your_module.text')
-    @patch('your_module.pd.Timedelta')
-    def test_calculate_repayment_schedule_invalid_loan_id(self, mock_pandas_timedelta, mock_text, mock_connect):
-        # Mock the database connection
-        conn = Mock()
-        mock_connect.return_value = conn
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_non Numeric_loan_id(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = "test"
 
-        # Mock the query execution
-        query = Mock()
-        mock_text.return_value = query
-
-        # Mock the fetchone method
-        result = None
-        query.execute.return_value = result
-
-        # Mock the pandas datetime.timedelta
-        mock_pandas_timedelta.return_value = timedelta(days=30)
+        # Mock the database operations
+        mock_result = Mock()
+        mock_engine.execute.side_effect = [psycopg2.ProgrammingError("Cannot convert type 'str' to int")]
+        mock_result.fetchone.return_value = None
+        mock_engine.execute.return_value = mock_result
 
         # Call the function
-        self.assertRaises(Exception, calculate_repayment_schedule, 0)
+        with self.assertRaises(psycopg2.ProgrammingError):
+            loan_repayment_schedule(loan_id)
 
-    @patch('your_module.engine.connect')
-    @patch('your_module.text')
-    @patch('your_module.pd.Timedelta')
-    def test_calculate_repayment_schedule_invalid_loan_details(self, mock_pandas_timedelta, mock_text, mock_connect):
-        # Mock the database connection
-        conn = Mock()
-        mock_connect.return_value = conn
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_zero_loan_amount(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1
+        expected_df = pd.DataFrame({
+            "Payment Number": [1],
+            "Payment Date": ["2022-01-01"],
+            "Principal Amount": [0],
+            "Interest Amount": [0],
+            "Total Payment": [0],
+            "Balance": [0]
+        })
 
-        # Mock the query execution
-        query = Mock()
-        mock_text.return_value = query
-
-        # Mock the fetchone method
-        result = Mock()
-        result.fetchone.return_value = (0, 1, 1, date(2022, 1, 1))
-        query.execute.return_value = result
-
-        # Mock the pandas datetime.timedelta
-        mock_pandas_timedelta.return_value = timedelta(days=30)
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = (0, 10, 12, "2022-01-01")
+        mock_engine.execute.return_value = mock_result
 
         # Call the function
-        self.assertRaises(Exception, calculate_repayment_schedule, 1)
+        result = loan_repayment_schedule(loan_id)
+
+        # Assert
+        self.assertEqual(result.equals(expected_df), True)
+
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_zero_interest_rate(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1
+        expected_df = pd.DataFrame({
+            "Payment Number": [1],
+            "Payment Date": ["2022-01-01"],
+            "Principal Amount": [1000],
+            "Interest Amount": [0],
+            "Total Payment": [1000],
+            "Balance": [0]
+        })
+
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 0, 12, "2022-01-01")
+        mock_engine.execute.return_value = mock_result
+
+        # Call the function
+        result = loan_repayment_schedule(loan_id)
+
+        # Assert
+        self.assertEqual(result.equals(expected_df), True)
+
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_zero_loan_term(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1
+        expected_df = pd.DataFrame({
+            "Payment Number": [1],
+            "Payment Date": ["2022-01-01"],
+            "Principal Amount": [1000],
+            "Interest Amount": [0],
+            "Total Payment": [1000],
+            "Balance": [0]
+        })
+
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 10, 0, "2022-01-01")
+        mock_engine.execute.return_value = mock_result
+
+        # Call the function
+        result = loan_repayment_schedule(loan_id)
+
+        # Assert
+        self.assertEqual(result.equals(expected_df), True)
+
+    @patch('your_module.engine')
+    @patch('psycopg2')
+    def test_loan_repayment_schedule_loan_term_greater_thanZero(self, mock_psycopg2, mock_engine):
+        # Setup
+        loan_id = 1
+        expected_df = pd.DataFrame({
+            "Payment Number": [1],
+            "Payment Date": ["2022-01-01"],
+            "Principal Amount": [1000],
+            "Interest Amount": [0],
+            "Total Payment": [1000],
+            "Balance": [0]
+        })
+
+        # Mock the database operations
+        mock_result = Mock()
+        mock_result.fetchone.return_value = (1000, 10, 12, "2022-01-01")
+        mock_engine.execute.return_value = mock_result
+
+        # Call the function
+        result = loan_repayment_schedule(loan_id)
+
+        # Assert
+        self.assertEqual(result.equals(expected_df), True)
 
 if __name__ == '__main__':
     unittest.main()

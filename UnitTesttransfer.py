@@ -1,49 +1,55 @@
 
 import unittest
-from your_module import transfer_amount
-from psycopg2 import OperationalError 
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+from your_module import transfer_amount  # Replace with the actual module name
 
 class TestTransferAmount(unittest.TestCase):
+    @patch.object(psycopg2, 'connect')
+    @patch.object(pd, 'read_sql')
+    @patch('config.engine')
+    def test_transfer_amount(self, mock_engine, mock_read_sql, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_engine.connect.return_value = mock_connect
+        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]})
 
-    @patch('config.engine.connect')
-    @patch('your_module.engine')
-    @patch('psycopg2.connect')
-    def test_transfer_amount(self, mock_engine, mock_psql, mock_conn):
-        mock_engine.connect.return_value = mock_conn
-        mock_conn.execute.return_value = None
-        mock_conn.commit.return_value = None
+        transfer_amount(1, 2, 50)
 
-        transfer_amount(1, 2, 100)
+        self.assertEqual(mock_connect().execute.call_count, 2)
+        self.assertEqual(mock_connect().commit.call_count, 2)
+        self.assertEqual(mock_connect().close.call_count, 1)
 
-    @patch('config.engine.connect')
-    @patch('your_module.engine')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_with OperationalError(self, mock_engine, mock_psql, mock_conn):
-        mock_engine.connect.return_value = mock_conn
-        mock_conn.execute.side_effect = OperationalError('database operation failed')
-        with self.assertRaises(OperationalError):
-            transfer_amount(1, 2, 100)
+    @patch.object(psycopg2, 'connect')
+    @patch.object(pd, 'read_sql')
+    @patch('config.engine')
+    def test_transfer_amount_invalid_sender(self, mock_engine, mock_read_sql, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_engine.connect.return_value = mock_connect
+        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
 
-    def test_transfer_amount_with_invalid_sender_id(self):
-        with self.assertRaises(KeyError):
-            transfer_amount('abc', 2, 100)
+        with self.assertRaises(SequrityError):
+            transfer_amount(3, 2, 50)
 
-    def test_transfer_amount_with_invalid_receiver_id(self):
-        with self.assertRaises(KeyError):
-            transfer_amount(1, 'def', 100)
+    @patch.object(psycopg2, 'connect')
+    @patch.object(pd, 'read_sql')
+    @patch('config.engine')
+    def test_transfer_amount_invalid_receiver(self, mock_engine, mock_read_sql, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_engine.connect.return_value = mock_connect
+        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
 
-    def test_transfer_amount_with_invalid_amount_type(self):
-        with self.assertRaises(TypeError):
-            transfer_amount(1, 2, 'abc')
+        with self.assertRaises(SequrityError):
+            transfer_amount(1, 3, 50)
 
-    def test_transfer_amount_without_commit(self):
-        conn = engine.connect()
-        query = text("UPDATE accounts SET balance = balance - 100 WHERE id = 1")
-        conn.execute(query, {'p_sender': 1, 'p_amount': 100})
-        conn.close()
-        with self.assertRaises(UncommittedResultError):
-            transfer_amount(1, 2, 100)
+    @patch.object(psycopg2, 'connect')
+    @patch.object(pd, 'read_sql')
+    @patch('config.engine')
+    def test_transfer_amount_incorrect_amount(self, mock_engine, mock_read_sql, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_engine.connect.return_value = mock_connect
+        mock_read_sql.return_value = pd.DataFrame({'id': [1], 'balance': [100]}).set_index('id')
+
+        with self.assertRaises(SequrityError):
+            transfer_amount(1, 2, 150)
 
 if __name__ == '__main__':
     unittest.main()
