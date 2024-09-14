@@ -4,29 +4,34 @@ from sqlalchemy import text
 import pandas as pd
 import psycopg2
 
-def transfer_funds(p_sender, p_receiver, p_amount):
+def transfer_amount(p_sender, p_receiver, p_amount):
     try:
-        conn = engine.connect()
-        log_config = logging.basicConfig(level=logging.INFO)
-        logger = logging.getLogger(__name__)
-
         # Subtract the amount from the sender's account
-        updateSenderQuery = text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender")
-        resultSender = conn.execute(updateSenderQuery, {"p_sender": p_sender, "p_amount": p_amount})
-        logger.info("Updated sender's account balance: %s", resultSender)
+        update_sender = text("""UPDATE accounts
+                                SET balance = balance - :p_amount
+                                WHERE id = :p_sender""")
+        result_sender = engine.execute(update_sender, p_sender=p_sender, p_amount=p_amount)
+        conn = engine.connect()
+        conn.commit()
 
         # Add the amount to the receiver's account
-        updateReceiverQuery = text("UPDATE accounts SET balance = balance + :p_amount WHERE id = :p_receiver")
-        resultReceiver = conn.execute(updateReceiverQuery, {"p_receiver": p_receiver, "p_amount": p_amount})
-        logger.info("Updated receiver's account balance: %s", resultReceiver)
-
+        update_receiver = text("""UPDATE accounts
+                                 SET balance = balance + :p_amount
+                                 WHERE id = :p_receiver""")
+        result_receiver = engine.execute(update_receiver, p_receiver=p_receiver, p_amount=p_amount)
         conn.commit()
-        logger.info("Transaction completed successfully!")
 
-    except (psycopg2.Error, Exception) as e:
-        logger.error("Error while transferring funds: %s", e)
+        # Get the updated balances
+        get_balances = text("SELECT * FROM accounts")
+        result_balances = engine.execute(get_balances).fetchall()
 
-    finally:
-        conn.close()
+        df_balances = pd.DataFrame(result_balances, columns=['id', 'balance'])
+        df_balances = df_balances.sort_values(by='id')
 
-    return None
+        return result_balances
+
+    except Exception as e:
+        print(f"Error: {e}")
+        return None
+
+transfer_amount(sender, receiver, amount)

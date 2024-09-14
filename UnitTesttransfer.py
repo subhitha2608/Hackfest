@@ -1,155 +1,70 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from transfer_funds import transfer_funds
+from your_module import transfer_amount  # Replace 'your_module' with the actual module name
 
-class TestTransferFunds(unittest.TestCase):
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.info')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_success(self, pd_mock, text_mock, conn_mock, error_mock, info_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': 100}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = 1
-        conn_mock.commit.return_value = None
-        error_mock = Mock()
-        info_mock = Mock()
-        getLogger_mock.return_value = Mock(info=info_mock)
+class TestTransferAmount(unittest.TestCase):
 
-        # Act
-        transfer_funds(1, 2, 50)
+    def setUp(self):
+        self.p_sender = 1
+        self.p_receiver = 2
+        self.p_amount = 100
 
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 2)
-        self.assertEqual(conn_mock.commit.call_count, 1)
-        self.assertEqual(info_mock.call_count, 3)
+    @patch('your_module.engine')
+    @patch('your_module.sqlalchemy')
+    @patch('your_module.conn')
+    @patch('your_module.conn.commit')
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_success(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
+        result_sender = Mock()
+        result_receiver = Mock()
+        result_balances = Mock()
+        mock_sqlalchemy.text.return_value = Mock()
+        mock_sqlalchemy.text.return_value = Mock()
+        mock_engine.execute.return_value = result_sender
+        mock_engine.connect.return_value = conn = Mock()
+        conn.commit.return_value = None
+        result_balances = [(1, 100), (2, 200)]
+        mock_engine.execute.return_value = result_balances
 
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.error')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_error(self, pd_mock, text_mock, conn_mock, error_mock, error_logger_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': 100}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = error_mock
-        error_mock = Mock()
-        error_logger_mock = Mock()
-        getLogger_mock.return_value = Mock(error=error_logger_mock)
+        self.assertEqual(transfer_amount(self.p_sender, self.p_receiver, self.p_amount), result_balances)
 
-        # Act
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 2, 50)
+    @patch('your_module.engine')
+    @patch('your_module.sqlalchemy')
+    @patch('your_module.conn')
+    @patch('your_module.conn.commit')
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_sender_does_not_exist(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
+        mock_engine.execute.side_effect = Exception("Error")
+        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
 
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 2)
-        self.assertEqual(error_logger_mock.call_count, 1)
+    @patch('your_module.engine')
+    @patch('your_module.sqlalchemy')
+    @patch('your_module.conn')
+    @patch('your_module.conn.commit')
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_receiver_does_not_exist(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
+        mock_engine.execute.side_effect = Exception("Error")
+        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
 
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.info')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_zero_balance(self, pd_mock, text_mock, conn_mock, error_mock, info_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': 0}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = 1
-        conn_mock.commit.return_value = None
-        error_mock = Mock()
-        info_mock = Mock()
-        getLogger_mock.return_value = Mock(info=info_mock)
+    @patch('your_module.engine')
+    @patch('your_module.sqlalchemy')
+    @patch('your_module.conn')
+    @patch('your_module.conn.commit')
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_invalid_amount(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
+        self.p_amount = "Invalid amount"
+        mock_engine.execute.side_effect = Exception("Error")
+        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
 
-        # Act
-        transfer_funds(1, 2, 50)
-
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 0)
-
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.info')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_negative_balance(self, pd_mock, text_mock, conn_mock, error_mock, info_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': -100}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = 1
-        conn_mock.commit.return_value = None
-        error_mock = Mock()
-        info_mock = Mock()
-        getLogger_mock.return_value = Mock(info=info_mock)
-
-        # Act
-        transfer_funds(1, 2, 50)
-
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 0)
-
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.info')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_invalid_sender(self, pd_mock, text_mock, conn_mock, error_mock, info_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': 100}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = error_mock
-        error_mock = Mock()
-        info_mock = Mock()
-        getLogger_mock.return_value = Mock(info=info_mock)
-
-        # Act
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(0, 2, 50)
-
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 0)
-
-    @patch('logging.basicConfig')
-    @patch('logging.getLogger')
-    @patch('logging.Logger.info')
-    @patch('psycopg2.Error')
-    @patch('psycopg2.connect')
-    @patch('sqlalchemy.text')
-    @patch('pandas')
-    def test_transfer_funds_invalid_receiver(self, pd_mock, text_mock, conn_mock, error_mock, info_mock, getLogger_mock, basicConfig_mock):
-        # Arrange
-        pd_mock.DataFrame = Mock(return_value=[{'id': 1, 'balance': 100}])
-        text_mock = Mock(return_value=text("UPDATE accounts SET balance = balance - :p_amount WHERE id = :p_sender"))
-        conn_mock = Mock()
-        conn_mock.execute.return_value = error_mock
-        error_mock = Mock()
-        info_mock = Mock()
-        getLogger_mock.return_value = Mock(info=info_mock)
-
-        # Act
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 0, 50)
-
-        # Assert
-        self.assertEqual(conn_mock.execute.call_count, 0)
+    @patch('your_module.engine')
+    @patch('your_module.sqlalchemy')
+    @patch('your_module.conn')
+    @patch('your_module.conn.commit')
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_error_in_query(self, mock_engine_connect, mock_conn_commit, mock_conn, mock_sqlalchemy, mock_engine):
+        mock_engine.execute.side_effect = Exception("Error")
+        self.assertIsNone(transfer_amount(self.p_sender, self.p_receiver, self.p_amount))
 
 if __name__ == '__main__':
     unittest.main()

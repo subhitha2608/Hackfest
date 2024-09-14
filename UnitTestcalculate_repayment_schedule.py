@@ -1,57 +1,65 @@
 
 import unittest
-from unittest.mock import Mock
-from your_module import calculate_repayment_schedule  # replace with the actual module name
+from unittest.mock import patch, Mock
+from your_module import calculate_repayment_schedule
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
+    @patch('your_module.engine')
+    @patch('your_module.text')
+    def test_calculate_repayment_schedule(self, mock_text, mock_engine):
+        # Mock the database query to return a loan record with a valid loan id
+        loan_id = 123
+        result = {'loanamount': 10000, 'interestrate': 5, 'loanterm': 360, 'startdate': '2022-01-01'}
+        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
+        mock_engine.execute.return_value = Mock(fetchone= lambda: result)
 
-    def setUp(self):
-        self.engine = Mock()
-        self.engine.connect.return_value = Mock()
-        self.conn = self.engine.connect.return_value
-        self.conn.execute.return_value = Mock()
-        self.conn.execute.return_value.fetchall.return_value = [(1000, 5, 60, '2020-01-01')]
-        self.engine.connect.return_value.commit.return_value = None
-        self.engine.connect.return_value.rollback.return_value = None
-        self.conn.close.return_value = None
+        # Call the function
+        repayment_schedule = calculate_repayment_schedule(loan_id)
 
-    def test_calculate_repayment_schedule_valid_loan_id(self):
-        result = calculate_repayment_schedule(1)
-        self.conn.execute.assert_called_once()
-        self.conn.execute().return_value.fetchone.assert_called_once()
-        self.conn.execute().return_value.fetchall.assert_called_once()
-        self.assertEqual(len(result), len([(1000, 5, 60, '2020-01-01')]))
+        # Verify the function execution
+        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
+        self.assertEqual(len(repayment_schedule), result['loanterm'])
 
-    def test_calculate_repayment_schedule_invalid_loan_id(self):
-        self.conn.execute().return_value.fetchone.return_value = None
-        result = calculate_repayment_schedule(1)
-        self.conn.execute.assert_called_once()
-        self.conn.execute().return_value.fetchone.assert_called_once()
-        self.assertEqual(result, [])
+        # Verify each payment in the schedule
+        for payment in repayment_schedule:
+            self.assertIn('paymentnumber', payment)
+            self.assertIn('paymentdate', payment)
+            self.assertIn('principalamount', payment)
+            self.assertIn('interestamount', payment)
+            self.assertIn('totalpayment', payment)
+            self.assertIn('balance', payment)
 
-    def test_calculate_repayment_schedule_error_occurs(self):
-        self.conn.execute().return_value.fetchone.side_effect = psycopg2.Error('Error')
-        result = calculate_repayment_schedule(1)
-        self.conn.execute.assert_called_once()
-        self.conn.execute().return_value.fetchone.assert_called_once()
-        self.assertEqual(result, [])
+    @patch('your_module.engine')
+    @patch('your_module.text')
+    def test_calculate_repayment_schedule_invalid_loan_id(self, mock_text, mock_engine):
+        # Mock the database query to return a loan record with an invalid loan id
+        loan_id = 99999
+        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
+        mock_engine.execute.return_value = Mock(fetchone= lambda: None)
 
-    def test_calculate_repayment_schedule_cursor_error_occurs(self):
-        self.conn.execute.side_effect = Exception('Cursor error')
-        result = calculate_repayment_schedule(1)
-        self.conn.execute.assert_called_once()
-        self.assertEqual(result, [])
+        # Call the function
+        with self.assertRaises(ValueError):
+            calculate_repayment_schedule(loan_id)
 
-    def test_calculate_repayment_schedule_repayment_schedule(self):
-        result = calculate_repayment_schedule(1)
-        self.assertEqual(len(result[0]), 8)
-        self.assertEqual(result[0][0], 1)
-        self.assertEqual(result[0][1], 1000)
-        self.assertEqual(result[0][2], 0)
-        self.assertEqual(result[0][3], 0)
-        self.assertEqual(result[0][4], 50)
-        self.assertEqual(result[0][5], 30)
-        self.assertEqual(result[0][6], 900)
+        # Verify the function execution
+        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
+        self.assertIsNone(repayment_schedule)
+
+    @patch('your_module.engine')
+    @patch('your_module.text')
+    def test_calculate_repayment_schedule_zero_loan_term(self, mock_text, mock_engine):
+        # Mock the database query to return a loan record with a zero loan term
+        loan_id = 123
+        result = {'loanamount': 10000, 'interestrate': 5, 'loanterm': 0, 'startdate': '2022-01-01'}
+        mock_text.return_value = 'SELECT loanamount, interestrate, loanterm, startdate FROM loans WHERE loanid = :loan_id'
+        mock_engine.execute.return_value = Mock(fetchone= lambda: result)
+
+        # Call the function
+        repayment_schedule = calculate_repayment_schedule(loan_id)
+
+        # Verify the function execution
+        mock_engine.execute.assert_called_once_with(mock_text.return_value, loan_id=loan_id)
+        self.assertEqual(len(repayment_schedule), 0)
 
 if __name__ == '__main__':
     unittest.main()
