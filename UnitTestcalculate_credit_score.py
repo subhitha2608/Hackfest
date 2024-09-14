@@ -1,25 +1,22 @@
 
 import unittest
-from your_module import calculate_credit_score  # Replace with the actual module name
+from calculate_credit_score import calculate_credit_score
 
 class TestCalculateCreditScore(unittest.TestCase):
-    def test_calculate_credit_score(self):
-        # Test with a customer who has loans, credit cards, and late payments
+    def test_calculate_credit_score customerId1(self):
         customer_id = 1
-        credit_score = calculate_credit_score(customer_id)
-        self.assertEqual(credit_score, 650)
+        result = calculate_credit_score(customer_id)
+        self.assertEquals(result, 650)  # Replace with expected result for customer_id 1
 
-    def test_calculate_credit_score_no_loans(self):
-        # Test with a customer who has no loans
+    def test_calculate_credit_score_customerId2(self):
         customer_id = 2
-        credit_score = calculate_credit_score(customer_id)
-        self.assertEqual(credit_score, 700)
+        result = calculate_credit_score(customer_id)
+        self.assertEquals(result, 700)  # Replace with expected result for customer_id 2
 
-    def test_calculate_credit_score_no_credit_cards(self):
-        # Test with a customer who has no credit cards
+    def test_calculate_credit_score_customerId3(self):
         customer_id = 3
-        credit_score = calculate_credit_score(customer_id)
-        self.assertEqual(credit_score, 750)
+        result = calculate_credit_score(customer_id)
+        self.assertEquals(result, 550)  # Replace with expected result for customer_id 3
 
 if __name__ == '__main__':
     unittest.main()

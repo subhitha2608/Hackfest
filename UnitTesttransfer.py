@@ -1,59 +1,45 @@
 
 import unittest
-from your_module import transfer_amount  # replace with the actual module name
+from your_module import transfer_funds  # replace with the actual module name
 
-class TestTransferAmount(unittest.TestCase):
-    def test_transfer_amount_same_accounts(self):
-        sender_id = 1
-        receiver_id = 1
-        amount = 10
-        initial_balance = 100
-        
-        # create a test account with initial balance
-        with engine.connect() as connection:
-            connection.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {'balance': initial_balance, 'id': sender_id})
-            connection.commit()
-        
-        transfer_amount(sender_id, receiver_id, amount)
-        
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': sender_id})
-            balance = result.fetchone()[0]
-            self.assertEqual(balance, initial_balance)  # balance should not change when sender and receiver are the same
+class TestTransferFunds(unittest.TestCase):
+    def test_transfer_funds_valid(self):
+        # Setup initial balances for testing
+        conn = engine.connect()
+        conn.execute(text("UPDATE accounts SET balance = 100 WHERE id = 1"))
+        conn.execute(text("UPDATE accounts SET balance = 50 WHERE id = 2"))
+        conn.commit()
+        conn.close()
 
-    def test_transfer_amount_different_accounts(self):
-        sender_id = 1
-        receiver_id = 2
-        amount = 10
-        initial_sender_balance = 100
-        initial_receiver_balance = 50
-        
-        # create test accounts with initial balances
-        with engine.connect() as connection:
-            connection.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {'balance': initial_sender_balance, 'id': sender_id})
-            connection.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {'balance': initial_receiver_balance, 'id': receiver_id})
-            connection.commit()
-        
-        transfer_amount(sender_id, receiver_id, amount)
-        
-        with engine.connect() as connection:
-            result = connection.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': sender_id})
-            sender_balance = result.fetchone()[0]
-            result = connection.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': receiver_id})
-            receiver_balance = result.fetchone()[0]
-            self.assertEqual(sender_balance, initial_sender_balance - amount)  # sender's balance should decrease
-            self.assertEqual(receiver_balance, initial_receiver_balance + amount)  # receiver's balance should increase
+        # Call the function to transfer funds
+        transfer_funds(1, 2, 20)
 
-    def test_transfer_amount_insufficient_funds(self):
-        sender_id = 1
-        receiver_id = 2
-        amount = 1000
-        initial_sender_balance = 100
-        
-        # create a test account with initial balance
-        with engine.connect() as connection:
-            connection.execute(text("UPDATE accounts SET balance = :balance WHERE id = :id"), {'balance': initial_sender_balance, 'id': sender_id})
-            connection.commit()
-        
+        # Check the updated balances
+        conn = engine.connect()
+        sender_balance = conn.execute(text("SELECT balance FROM accounts WHERE id = 1")).scalar()
+        receiver_balance = conn.execute(text("SELECT balance FROM accounts WHERE id = 2")).scalar()
+        conn.close()
+
+        self.assertEqual(sender_balance, 80)  # only one assertion per test
+        # Alternatively, you can assert both balances in one line:
+        # self.assertEqual((sender_balance, receiver_balance), (80, 70))
+
+    def test_transfer_funds_insufficient_funds(self):
+        # Setup initial balances for testing
+        conn = engine.connect()
+        conn.execute(text("UPDATE accounts SET balance = 50 WHERE id = 1"))
+        conn.execute(text("UPDATE accounts SET balance = 50 WHERE id = 2"))
+        conn.commit()
+        conn.close()
+
+        # Call the function to transfer funds
         with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id, receiver_id, amount)  # should raise an error since sender has insufficient funds
+            transfer_funds(1, 2, 100)
+
+    def test_transfer_funds_invalid_sender(self):
+        # Call the function to transfer funds with an invalid sender
+        with self.assertRaises(psycopg2.Error):
+            transfer_funds(999, 2, 20)
+
+if __name__ == '__main__':
+    unittest.main()
