@@ -1,97 +1,111 @@
 
-import pytest
-import pandas as pd
-from your_module import transfer_amount
+import unittest
+from your_module import wallet_transfer
 
-@pytest.fixture
-def engine_mock(mocker):
-    return mocker.Mock()
+class TestWalletTransfer(unittest.TestCase):
 
-@pytest.fixture
-def conn_mock(mocker):
-    return mocker.Mock()
+    def test_transfer succeeds(self):
+        # Mock the engine to return a successful result
+        def mock_engine_execute(sql, params):
+            if sql == text("""
+                UPDATE accounts
+                SET balance = balance - :p_amount
+                WHERE id = :p_sender;
+            """):
+                return pd.DataFrame({'balance': [100 - 100]})
+            elif sql == text("""
+                UPDATE accounts
+                SET balance = balance + :p_amount
+                WHERE id = :p_receiver;
+            """):
+                return pd.DataFrame({'balance': [100 + 100]})
+            else:
+                raise ValueError("Invalid SQL")
 
-@pytest.fixture
-def result_mock(mocker):
-    return mocker.Mock(return_value=None)
+        # Enable mocking for test
+        original.execute = engine.execute
+        engine.execute = mock_engine_execute
 
-@pytest.mark.usefixtures("engine_mock", "conn_mock", "result_mock")
-class TestTransferAmount:
-    def test_zero_amount(self, engine_mock, conn_mock, result_mock):
-        sender_id = "1"
-        receiver_id = "2"
-        amount = 0
-        result = transfer_amount(sender_id, receiver_id, amount)
-        assert result == []
-        engine_mock.execute.assert_called_once()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+        # Test the function
+        result = wallet_transfer(1, 2, 100)
+        self.assertEqual(result, "Transfer successful")
 
-    def test_sender_id_not_found(self, engine_mock, conn_mock, result_mock):
-        sender_id = "999"
-        receiver_id = "2"
-        amount = 100
-        result = transfer_amount(sender_id, receiver_id, amount)
-        assert result == []
-        engine_mock.execute.assert_called_once()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+        # Disable mocking
+        engine.execute = original.execute
 
-    def test_receiver_id_not_found(self, engine_mock, conn_mock, result_mock):
-        sender_id = "1"
-        receiver_id = "999"
-        amount = 100
-        result = transfer_amount(sender_id, receiver_id, amount)
-        assert result == []
-        engine_mock.execute.assert_called_once()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+    def test_transfer fails(self):
+        # Mock the engine to return an error
+        def mock_engine_execute(sql, params):
+            raise ValueError("Error")
 
-    def test_amount_is_zero(self, engine_mock, conn_mock, result_mock):
-        sender_id = "1"
-        receiver_id = "2"
-        amount = 0
-        result = transfer_amount(sender_id, receiver_id, amount)
-        assert result == []
-        engine_mock.execute.assert_called_once()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+        # Enable mocking for test
+        original.execute = engine.execute
+        engine.execute = mock_engine_execute
 
-    def test_sender_balance_empty(self, engine_mock, conn_mock, result_mock):
-        sender_id = "1"
-        receiver_id = "2"
-        amount = 100
-        engine.execute.return_value.fetchall.return_value = []
-        result = transfer_amount(sender_id, receiver_id, amount)
-        assert result == []
-        engine_mock.execute.assert_called_once()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+        # Test the function
+        result = wallet_transfer(1, 2, 100)
+        self.assertEqual(result, "Error")
 
-    def test_receiver_balance_empty(self, engine_mock, conn_mock, result_mock):
-        sender_id = "1"
-        receiver_id = "2"
-        amount = 100
-        update_receiver = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver_id")
-        result = engine.execute(update_receiver, {"receiver_id": receiver_id, "amount": 0})
-        conn.commit()
-        result_mock.reset_mock()
-        result_mock.fetchall.return_value = []
-        result_mock.reset_mock()
-        result_mock.return_value = None
-        conn_mock.commit.assert_called()
+        # Disable mocking
+        engine.execute = original.execute
+
+    def test_sender_id_not_found(self):
+        # Mock the engine to return a successful result with a sender_id that does not exist
+        def mock_engine_execute(sql, params):
+            if sql == text("""
+                UPDATE accounts
+                SET balance = balance - :p_amount
+                WHERE id = :p_sender;
+            """):
+                return pd.DataFrame({'balance': [100 - 100]})
+            elif sql == text("""
+                UPDATE accounts
+                SET balance = balance + :p_amount
+                WHERE id = :p_receiver;
+            """):
+                raise ValueError("Invalid sender_id")
+            else:
+                raise ValueError("Invalid SQL")
+
+        # Enable mocking for test
+        original.execute = engine.execute
+        engine.execute = mock_engine_execute
+
+        # Test the function
+        result = wallet_transfer(3, 2, 100)
+        self.assertEqual(result, "Invalid sender_id")
+
+        # Disable mocking
+        engine.execute = original.execute
+
+    def test_sender_id_invalid_amount(self):
+        # Mock the engine to return a successful result with an invalid amount
+        def mock_engine_execute(sql, params):
+            if sql == text("""
+                UPDATE accounts
+                SET balance = balance - :p_amount
+                WHERE id = :p_sender;
+            """):
+                raise ValueError("Invalid amount")
+            elif sql == text("""
+                UPDATE accounts
+                SET balance = balance + :p_amount
+                WHERE id = :p_receiver;
+            """):
+                return pd.DataFrame({'balance': [100 + 100]})
+            else:
+                raise ValueError("Invalid SQL")
+
+        # Enable mocking for test
+        original.execute = engine.execute
+        engine.execute = mock_engine_execute
+
+        # Test the function
+        result = wallet_transfer(1, 2, 1000)
+        self.assertEqual(result, "Invalid amount")
+
+        # Disable mocking
+        engine.execute = original.execute
+
+if __name__ == '__main__':
+    unittest.main()

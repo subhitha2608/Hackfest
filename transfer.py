@@ -1,19 +1,31 @@
 Python
 from config import engine
-from sqlalchemy import text
 import pandas as pd
-import psycopg2
+from sqlalchemy import text
 
-def transfer_amount(sender_id, receiver_id, amount):
-    # Subtract the amount from the sender's account
-    update_sender = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender_id")
-    result = engine.execute(update_sender, {"sender_id": sender_id, "amount": amount})
-    conn = engine.connect()
-    conn.commit()
-    
-    # Add the amount to the receiver's account
-    update_receiver = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver_id")
-    result = engine.execute(update_receiver, {"receiver_id": receiver_id, "amount": amount})
-    conn.commit()
-    
-    return result.fetchall()
+def wallet_transfer(p_sender, p_receiver, p_amount):
+    try:
+        # Subtract the amount from the sender's account
+        update_sender = text("""
+            UPDATE accounts
+            SET balance = balance - :p_amount
+            WHERE id = :p_sender;
+        """)
+        engine.execute(update_sender, {"p_sender": p_sender, "p_amount": p_amount})
+
+        # Add the amount to the receiver's account
+        update_receiver = text("""
+            UPDATE accounts
+            SET balance = balance + :p_amount
+            WHERE id = :p_receiver;
+        """)
+        engine.execute(update_receiver, {"p_receiver": p_receiver, "p_amount": p_amount})
+
+        engine.commit()
+        return "Transfer successful"
+    except Exception as e:
+        engine.rollback()
+        return str(e)
+
+# test the function
+wallet_transfer(1, 2, 100)

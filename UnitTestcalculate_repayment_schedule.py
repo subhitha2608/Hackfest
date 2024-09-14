@@ -1,92 +1,73 @@
-Python
-from unittest import TestCase, mock
-from your_module import calculate_repayment_schedule  # Import the module with the function
 
-class TestCalculateRepaymentSchedule(TestCase):
-    @mock.patch('your_module.engine')
-    @mock.patch('your_module.text')
-    @mock.patch('your_module(pd)')
-    def test_calculate_repayment_schedule(self, mock_pd, mock_text, mock_engine):
-        # Mock the engine for connecting to the database
-        mock_conn = mock_engine.connect.return_value
-        mock_query = mock_text.return_value
+import unittest
+from unittest.mock import patch, Mock
+from datetime import datetime, timedelta
+
+class TestCalculateRepaymentSchedule(unittest.TestCase):
+
+    @patch('config.engine')
+    def test_calculate_repayment_schedule(self, mock_engine):
+        loan_id = 1
+        loan_amount = 100000
+        interest_rate = 6
+        loan_term = 360
+        start_date = datetime.now()
+
+        with mock_engine.connect() as conn:
+            conn.execute = Mock(return_value=[loan_amount, interest_rate/100/12, loan_term, start_date])
+
+        calculate_repayment_schedule(loan_id)
+        repayment_schedule_entries = [(1, 1, start_date, 0, 100000, 100000, 100000), 
+                                       (1, 2, start_date + timedelta(days=30), 0, 1499.97, 100000, 89801.03), 
+                                       (1, 3, start_date + timedelta(days=60), 0, 1499.97, 100000, 74801.06), 
+                                       ...
+                                       (1, 360, start_date + timedelta(days=35160), 0, 0, 100000, 0)]
+
+        mock_engine.execute.assert_any_call("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)", 
+                                             {"loan_id": 1, "payment_number": 1, "payment_date": start_date, "principal_amount": 0, "interest_amount": 500, "monthly_payment": 2679.68, "balance": 100000})
+        mock_engine.execute.assert_any_call("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)", 
+                                             {"loan_id": 1, "payment_number": 360, "payment_date": start_date + timedelta(days=35160), "principal_amount": 0, "interest_amount": 0, "monthly_payment": 2679.68, "balance": 0})
+        mock_engine.commit.assert_called_once()
+
+    @patch('config.engine')
+    def test_calculate_repayment_schedule_no_loan_found(self, mock_engine):
+        loan_id = 1
+        with mock_engine.connect() as conn:
+            conn.execute = Mock(return_value=None)
         
-        # Mock the fetchone query
-        mock_query.execute.return_value = [(1000, 5, 36, '2020-01-01')]  # Mock loan details
-        conn = engine.connect()
+        self.assertRaises(IndexError, calculate_repayment_schedule, loan_id)
+        mock_engine.execute.assert_called_once()
+
+    @patch('config.engine')
+    def test_calculate_repayment_schedule_database_error(self, mock_engine):
+        loan_id = 1
+        with mock_engine.connect() as conn:
+            conn.execute = Mock(side_effect=Exception("Database Error"))
         
-        # Get loan details
-        loan_details_query = text("""
-        SELECT loanamount, interestrate, loanterm, startdate
-        FROM loans
-        WHERE loanid = :loan_id
-        """)
-        loan_details = conn.execute(loan_details_query, {'loan_id': 123}).fetchone()
-        loan_amount, interest_rate, loan_term, start_date = loan_details
+        self.assertRaises(Exception, calculate_repayment_schedule, loan_id)
+        mock_engine.execute.assert_called_once()
 
-        # Convert annual interest rate to monthly interest rate
-        monthly_interest_rate = (interest_rate / 100 / 12)
-
-        # Calculate fixed monthly payment
-        monthly_payment = (loan_amount * monthly_interest_rate) / (1 - pow(1 + monthly_interest_rate, -loan_term))
-
-        # Initialize balance and payment_date
-        balance = loan_amount
-        payment_date = start_date
-
-        # Initialize payment_number
-        payment_number = 1
-
-        # Create a list to store repayment details
-        repayment_schedule = []
-        while payment_number <= loan_term:
-            # Calculate interest and principal for the current month
-            interest_amount = balance * monthly_interest_rate
-            principal_amount = monthly_payment - interest_amount
-
-            # Deduct principal from balance
-            balance -= principal_amount
-
-            # Add repayment details to the list
-            repayment_schedule.append({
-                'loanid': 123,
-                'paymentnumber': payment_number,
-                'paymentdate': payment_date.strftime('%Y-%m-%d'),
-                'principalamount': principal_amount,
-                'interestamount': interest_amount,
-                'totalpayment': monthly_payment,
-                'balance': balance
-            })
-
-            # Move to the next month
-            payment_date += pd.Timedelta(days=30)
-            payment_number += 1
-
-        # Insert repayment details into the RepaymentSchedule table
-        insert_query = text("""
-        INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-        VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
-        """)
-        mock_conn.execute.return_value = None
-        conn.commit()
-        conn.close()
+    @patch('config.engine')
+    def test_calculate_repayment_schedule_invalid_loan_term(self, mock_engine):
+        loan_id = 1
+        invalid_loan_term = -1
+        with mock_engine.connect() as conn:
+            conn.execute = Mock(return_value=[100000, 6/100/12, invalid_loan_term, datetime.now()])
         
-        # Create a pandas Series from the repayment schedule
-        result = calculate_repayment_schedule(123)
-        result = pd.DataFrame(result)
-        # Test
-        self.assertEqual(result.shape, (36, 7))
+        with self.assertRaises(IndexError):
+            calculate_repayment_schedule(loan_id)
+        mock_engine.execute.assert_called_once()
+
+    @patch('config.engine')
+    def test_calculate_repayment_schedule_invalid_interest_rate(self, mock_engine):
+        loan_id = 1
+        invalid_interest_rate = 12
+        with mock_engine.connect() as conn:
+            conn.execute = Mock(return_value=[100000, invalid_interest_rate/100/12, 360, datetime.now()])
         
-        # Test the columns
-        self.assertEqual(set(result.columns), {'loanid', 'paymentnumber', 'paymentdate', 'principalamount', 'interestamount', 'totalpayment', 'balance'})
+        with self.assertRaises(IndexError):
+            calculate_repayment_schedule(loan_id)
+        mock_engine.execute.assert_called_once()
 
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
-
-    # Test with different inputs to check all edge cases
-    test_calculate_repayment_schedule(1)
-    test_calculate_repayment_schedule(None)
-    test_calculate_repayment_schedule('')
-    test_calculate_repayment_schedule(0)
-
