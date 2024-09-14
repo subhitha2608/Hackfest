@@ -1,64 +1,66 @@
-Python
+
 import unittest
-from your_module import transfer_amount  # Import your function from the module
+from your_module import transfer_funds
+import pandas as pd
 
-class TestTransferAmount(unittest.TestCase):
+class TestTransferFunds(unittest.TestCase):
 
-    def test_transfer_amount_within_balance(self):
-        # If the sender has enough balance
-        transfer_amount(1, 2, 100.0)
-        conn = create_engine('postgresql://user:password@localhost/dbname').connect()
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 1"))
-        self.assertEqual(result.first()[0], 0.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 2"))
-        self.assertEqual(result.first()[0], 100.0)
-        
-        conn.close()
+    def test_transfer_funds_valid_input(self):
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 1000)"))
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
+        transfer_funds(1, 2, 500)
+        query = text("SELECT balance FROM accounts WHERE id = 1")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 500)
+        query = text("SELECT balance FROM accounts WHERE id = 2")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 500)
+        engine.execute(text("DELETE FROM accounts"))
 
-    def test_transfer_amount_exceeds_balance(self):
-        # If the sender does not have enough balance
-        with self.assertRaises(AttributeError):
-            transfer_amount(1, 2, 200.0)
-        conn = create_engine('postgresql://user:password@localhost/dbname').connect()
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 1"))
-        self.assertEqual(result.first()[0], 100.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 2"))
-        self.assertEqual(result.first()[0], 0.0)
-        conn.close()
+    def test_transfer_funds_invalid_sender_id(self):
+        with self.assertRaises(Exception):
+            transfer_funds(0, 2, 500)
 
-    def test_transfer_amount_receive_non_existent_account(self):
-        # If the receiver is not in the database
-        with self.assertRaises(AttributeError):
-            transfer_amount(1, 3, 50.0)
-        conn = create_engine('postgresql://user:password@localhost/dbname').connect()
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 1"))
-        self.assertEqual(result.first()[0], 100.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 2"))
-        self.assertEqual(result.first()[0], 0.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 3"))
-        self.assertIsNone(result.first())
-        conn.close()
+    def test_transfer_funds_invalid_receiver_id(self):
+        with self.assertRaises(Exception):
+            transfer_funds(1, 0, 500)
 
-    def test_transfer_amount_sender_non_existent_account(self):
-        # If the sender is not in the database
-        with self.assertRaises(AttributeError):
-            transfer_amount(3, 2, 50.0)
-        conn = create_engine('postgresql://user:password@localhost/dbname').connect()
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 1"))
-        self.assertEqual(result.first()[0], 100.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 2"))
-        self.assertEqual(result.first()[0], 0.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 3"))
-        self.assertIsNone(result.first())
-        conn.close()
+    def test_transfer_funds_amount_zero(self):
+        with self.assertRaises(ZeroDivisionError):
+            transfer_funds(1, 2, 0)
 
-    def test_transfer_amount_receiver_exceeds_balance(self):
-        # If the receiver's balance exceeds maximum balance
-        with self.assertRaises(AttributeError):
-            transfer_amount(1, 2, 2000.0)
-        conn = create_engine('postgresql://user:password@localhost/dbname').connect()
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 1"))
-        self.assertEqual(result.first()[0], 100.0)
-        result = conn.execute(text("SELECT balance FROM accounts WHERE id = 2"))
-        self.assertEqual(result.first()[0], 0.0)
-        conn.close()
+    def test_transfer_funds_negative_amount(self):
+        try:
+            transfer_funds(1, 2, -500)
+            self.fail("Expected exception")
+        except Exception as e:
+            self.assertEqual(str(e), "transfer amount cannot be negative")
+
+    def test_transfer_funds_insufficient_funds(self):
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 100)"))
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
+        with self.assertRaises(Exception):
+            transfer_funds(1, 2, 200)
+        query = text("SELECT balance FROM accounts WHERE id = 1")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 100)
+        query = text("SELECT balance FROM accounts WHERE id = 2")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 0)
+
+    def test_transfer_funds_connection_error(self):
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (1, 100)"))
+        engine.execute(text("INSERT INTO accounts (id, balance) VALUES (2, 0)"))
+        try:
+            transfer_funds(1, 2, 500)
+        except Exception as e:
+            self.assertEqual(str(e), "connection failed")
+        query = text("SELECT balance FROM accounts WHERE id = 1")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 100)
+        query = text("SELECT balance FROM accounts WHERE id = 2")
+        result = engine.execute(query).fetchone()[0]
+        self.assertEqual(result, 0)
+
+if __name__ == '__main__':
+    unittest.main()

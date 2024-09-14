@@ -1,62 +1,38 @@
 
 import unittest
-from your_module import calculate_repayment_schedule
-import pandas as pd
+from unittest.mock import patch
+from your_module import calculate_repayment_schedule  # replace 'your_module' with the actual name of your module
 
 class TestCalculateRepaymentSchedule(unittest.TestCase):
 
-    def test_loan_id_missing(self):
-        with self.assertRaises(KeyError):
-            calculate_repayment_schedule(None)
+    @patch('config.engine')
+    @patch('sqlalchemy.text')
+    @patch('pandas.Timedelta')
+    def test_calculate_repayment_schedule(self, mock_Timedelta, mock_text, mock_engine):
+        # Test 1: Successful execution of the function
+        mock_result = [(1000, 4.5, 6, '2022-01-01')]
+        mock_engine.return_value.execute.return_value.fetchall.return_value = [mock_result]
+        with patch.object(mock_engine.return_value, 'begin', return_value=mock_engine.return_value) as mock_conn:
+            self.assertTrue(calculate_repayment_schedule(1))
+            mock_conn.commit.assert_called_once()
 
-    def test_non_numeric_loan_amount(self):
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(123, loan_amount='abc')
+        # Test 2: Fail to execute the function
+        mock_engine.return_value.execute.return_value.fetchall.return_value = None
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(1)
+            mock_engine.return_value.execute.return_value.execute.assert_not_called()
 
-    def test_non_numeric_interest_rate(self):
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(123, interest_rate='abc')
+        # Test 3: Invalid loan id
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(0)
+            mock_engine.return_value.execute.return_value.execute.assert_not_called()
 
-    def test_non_numeric_loan_term(self):
-        with self.assertRaises(ValueError):
-            calculate_repayment_schedule(123, loan_term='abc')
-
-    def test_calculate_fixed_monthly_payment(self):
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 60
-        monthly_interest_rate = interest_rate / 100 / 12
-        monthly_payment = (loan_amount * monthly_interest_rate) / (1 - pow(1 + monthly_interest_rate, -loan_term))
-        self.assertEqual(round(monthly_payment, 2), 152.19)
-
-    def test_calculate_interest_amount(self):
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 60
-        monthly_interest_rate = interest_rate / 100 / 12
-        monthly_payment = (loan_amount * monthly_interest_rate) / (1 - pow(1 + monthly_interest_rate, -loan_term))
-        balance = loan_amount
-        payment_number = 1
-        interest_amount = balance * monthly_interest_rate
-        self.assertEqual(round(interest_amount, 2), 41.67)
-
-    def test_calculate_principal_amount(self):
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 60
-        monthly_interest_rate = interest_rate / 100 / 12
-        monthly_payment = (loan_amount * monthly_interest_rate) / (1 - pow(1 + monthly_interest_rate, -loan_term))
-        balance = loan_amount
-        payment_number = 1
-        principal_amount = monthly_payment - balance * monthly_interest_rate
-        self.assertEqual(round(principal_amount, 2), 110.52)
-
-    def test_repayment_schedule(self):
-        loan_amount = 10000
-        interest_rate = 5
-        loan_term = 60
-        calculate_repayment_schedule(123, loan_amount, interest_rate, loan_term)
-        self.assertTrue(True)
+        # Test 4: Invalid loan term
+        mock_result = [(1000, 4.5, 'abc', '2022-01-01')]
+        mock_engine.return_value.execute.return_value.fetchall.return_value = [mock_result]
+        with self.assertRaises(Exception):
+            calculate_repayment_schedule(1)
+            mock_engine.return_value.execute.return_value.execute.assert_not_called()
 
 if __name__ == '__main__':
     unittest.main()

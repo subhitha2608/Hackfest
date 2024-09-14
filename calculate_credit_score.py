@@ -1,48 +1,75 @@
 
-from config import engine
-from sqlalchemy.sql import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 import pandas as pd
+from config import engine  # assuming you have a config file with the database connection settings
 
-def update_credit_score(p_customer_id):
-    conn = engine.connect()
-
+def calculate_credit_score(p_customer_id: int):
     # Step 1: Calculate the customer's total loan amount, total repayment, and outstanding balance
-    total_loan_amount = pd.read_sql(text("SELECT ROUND(SUM(loan_amount), 2) AS total_loan_amount FROM loans WHERE loans.customer_id = :customer_id"), conn, parameters={'customer_id': p_customer_id}).iloc[0]['total_loan_amount'] if total_loan_amount > 0 else 0
-    total_repayment = pd.read_sql(text("SELECT ROUND(SUM(repayment_amount), 2) AS total_repayment FROM payments WHERE payments.customer_id = :customer_id"), conn, parameters={'customer_id': p_customer_id}).iloc[0]['total_repayment'] if total_repayment > 0 else 0
-    outstanding_loan_balance = pd.read_sql(text("SELECT ROUND(SUM(outstanding_balance), 2) AS outstanding_loan_balance FROM loans WHERE loans.customer_id = :customer_id"), conn, parameters={'customer_id': p_customer_id}).iloc[0]['outstanding_loan_balance'] if outstanding_loan_balance > 0 else 0
+    total_loan_amount = pd.read_sql_query(text("""
+        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0) 
+        FROM loans 
+        WHERE loans.customer_id = :customer_id
+    """), engine, params={"customer_id": p_customer_id}).iloc[0, 0]
+
+    total_repayment = pd.read_sql_query(text("""
+        SELECT COALESCE(ROUND(SUM(repayment_amount), 2), 0) 
+        FROM loans 
+        WHERE loans.customer_id = :customer_id
+    """), engine, params={"customer_id": p_customer_id}).iloc[0, 0]
+
+    outstanding_loan_balance = pd.read_sql_query(text("""
+        SELECT COALESCE(ROUND(SUM(outstanding_balance), 2), 0) 
+        FROM loans 
+        WHERE loans.customer_id = :customer_id
+    """), engine, params={"customer_id": p_customer_id}).iloc[0, 0]
 
     # Step 2: Get the current credit card balance
-    credit_card_balance = pd.read_sql(text("SELECT ROUND(SUM(balance), 2) AS credit_card_balance FROM credit_cards WHERE credit_cards.customer_id = :customer_id"), conn, parameters={'customer_id': p_customer_id}).iloc[0]['credit_card_balance'] if credit_card_balance > 0 else 0
+    credit_card_balance = pd.read_sql_query(text("""
+        SELECT COALESCE(ROUND(SUM(balance), 2), 0) 
+        FROM credit_cards 
+        WHERE credit_cards.customer_id = :customer_id
+    """), engine, params={"customer_id": p_customer_id}).iloc[0, 0]
 
     # Step 3: Count the number of late payments
-    late_pay_count = pd.read_sql(text("SELECT COUNT(*) AS late_pay_count FROM payments WHERE payments.customer_id = :customer_id AND status = 'Late'"), conn, parameters={'customer_id': p_customer_id}).iloc[0]['late_pay_count']
+    late_pay_count = pd.read_sql_query(text("""
+        SELECT count(*) 
+        FROM payments 
+        WHERE payments.customer_id = :customer_id AND status = 'Late'
+    """), engine, params={"customer_id": p_customer_id}).iloc[0, 0]
 
     # Step 4: Basic rule-based calculation of the credit score
     v_credit_score = 0
     if total_loan_amount > 0:
-        v_credit_score += round((total_repayment / total_loan_amount) * 400, 2)
+        v_credit_score += round((total_repayment / total_loan_amount) * 400, 2)  # 40% weight for loan repayment
     else:
-        v_credit_score += 400
+        v_credit_score += 400  # If no loans, give average score for this factor
 
     if credit_card_balance > 0:
-        v_credit_score += round((1 - (credit_card_balance / 10000)) * 300, 2)
+        v_credit_score += round((1 - (credit_card_balance / 10000)) * 300, 2)  # 30% weight for credit card utilization
     else:
         v_credit_score += 300
 
-    v_credit_score -= late_pay_count * 50
+    v_credit_score -= late_pay_count * 50  # Deduct 50 points for each late payment
 
-    # Ensure the score stays within reasonable bounds
+    # Ensure the score stays within reasonable bounds (e.g., 300 to 850)
     if v_credit_score < 300:
         v_credit_score = 300
     elif v_credit_score > 850:
         v_credit_score = 850
 
     # Step 5: Update the customer’s credit score in the database
-    conn.execute(text("UPDATE customers SET credit_score = ROUND(:v_credit_score, 0) WHERE customers.id = :customer_id"), {'customer_id': p_customer_id, 'v_credit_score': v_credit_score})
+    engine.execute(text("""
+        UPDATE customers 
+        SET credit_score = ROUND(:v_credit_score, 0) 
+        WHERE customers.id = :customer_id
+    """), v_credit_score=v_credit_score, customer_id=p_customer_id)
 
     # Optionally, log the result or raise an alert for very low scores
     if v_credit_score < 500:
-        conn.execute(text("INSERT INTO credit_score_alerts (customer_id, credit_score, created_at) VALUES (:customer_id, ROUND(:v_credit_score, 0), NOW())"), {'customer_id': p_customer_id, 'v_credit_score': v_credit_score})
+        engine.execute(text("""
+            INSERT INTO credit_score_alerts (customer_id, credit_score, created_at)
+            VALUES (:customer_id, ROUND(:v_credit_score, 0), NOW())
+        """), customer_id=p_customer_id, v_credit_score=v_credit_score)
 
-    conn.commit()
-    conn.close()
+    engine.commit()  # commit changes to the database
