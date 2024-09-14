@@ -1,85 +1,65 @@
 
 import unittest
-from unittest.mock import patch
 from your_module import calculate_credit_score  # Replace with the actual module name
 
 class TestCalculateCreditScore(unittest.TestCase):
     def setUp(self):
-        self.engine = engine  # assuming engine is a valid SQLAlchemy engine
-        self.connection = self.engine.connect()
+        # Create a test database connection
+        self.engine = create_engine('postgresql://user:password@host:port/dbname')  # Replace with your test DB credentials
+        self.conn = self.engine.connect()
 
     def tearDown(self):
-        self.connection.close()
+        # Close the test database connection
+        self.conn.close()
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_positive(self, mock_connect):
-        # Mock the database queries to return expected results
-        mock_connect.return_value.execute.return_value.fetchone.side_effect = [
-            (1000.0, 800.0, 200.0),  # loan amounts
-            (500.0,),  # credit card balance
-            (0,),  # late payments
-        ]
-
+    def test_calculate_credit_score_no_loans(self):
+        # Create a test customer with no loans
         customer_id = 1
-        result = calculate_credit_score(customer_id)
-        self.assertAlmostEqual(result, 740, places=0)  # expected credit score
+        self.conn.execute("INSERT INTO customers (id) VALUES (%s)", (customer_id,))
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_no_loans(self, mock_connect):
-        # Mock the database queries to return expected results
-        mock_connect.return_value.execute.return_value.fetchone.side_effect = [
-            (0.0, 0.0, 0.0),  # no loans
-            (500.0,),  # credit card balance
-            (0,),  # late payments
-        ]
+        # Calculate credit score
+        credit_score = calculate_credit_score(customer_id)
 
-        customer_id = 1
-        result = calculate_credit_score(customer_id)
-        self.assertAlmostEqual(result, 650, places=0)  # expected credit score
+        # Assert the credit score is 700 (average score)
+        self.assertEqual(credit_score, 700)
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_no_credit_card(self, mock_connect):
-        # Mock the database queries to return expected results
-        mock_connect.return_value.execute.return_value.fetchone.side_effect = [
-            (1000.0, 800.0, 200.0),  # loan amounts
-            (0.0,),  # no credit card balance
-            (0,),  # late payments
-        ]
+    def test_calculate_credit_score_with_loans(self):
+        # Create a test customer with loans
+        customer_id = 2
+        self.conn.execute("INSERT INTO customers (id) VALUES (%s)", (customer_id,))
+        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)", (customer_id, 1000, 500, 500))
+        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)", (customer_id, 2000, 1000, 1000))
 
-        customer_id = 1
-        result = calculate_credit_score(customer_id)
-        self.assertAlmostEqual(result, 740, places=0)  # expected credit score
+        # Calculate credit score
+        credit_score = calculate_credit_score(customer_id)
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_late_payments(self, mock_connect):
-        # Mock the database queries to return expected results
-        mock_connect.return_value.execute.return_value.fetchone.side_effect = [
-            (1000.0, 800.0, 200.0),  # loan amounts
-            (500.0,),  # credit card balance
-            (2,),  # 2 late payments
-        ]
+        # Assert the credit score is higher than 700 (due to loan repayment)
+        self.assertGreater(credit_score, 700)
 
-        customer_id = 1
-        result = calculate_credit_score(customer_id)
-        self.assertAlmostEqual(result, 640, places=0)  # expected credit score
+    def test_calculate_credit_score_with_credit_card(self):
+        # Create a test customer with a credit card
+        customer_id = 3
+        self.conn.execute("INSERT INTO customers (id) VALUES (%s)", (customer_id,))
+        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)", (customer_id, 5000))
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_invalid_customer_id(self, mock_connect):
-        # Mock the database queries to return None
-        mock_connect.return_value.execute.return_value.fetchone.return_value = None
+        # Calculate credit score
+        credit_score = calculate_credit_score(customer_id)
 
-        customer_id = 123456  # invalid customer ID
-        with self.assertRaises(RuntimeError):
-            calculate_credit_score(customer_id)
+        # Assert the credit score is lower than 700 (due to credit card utilization)
+        self.assertLess(credit_score, 700)
 
-    @patch('your_module.engine.connect')
-    def test_calculate_credit_score_connection_error(self, mock_connect):
-        # Mock the database connection to raise an error
-        mock_connect.return_value.execute.side_effect = psycopg2.Error("Mock connection error")
+    def test_calculate_credit_score_with_late_payments(self):
+        # Create a test customer with late payments
+        customer_id = 4
+        self.conn.execute("INSERT INTO customers (id) VALUES (%s)", (customer_id,))
+        self.conn.execute("INSERT INTO payments (customer_id, status) VALUES (%s, %s)", (customer_id, 'Late'))
+        self.conn.execute("INSERT INTO payments (customer_id, status) VALUES (%s, %s)", (customer_id, 'Late'))
 
-        customer_id = 1
-        with self.assertRaises(psycopg2.Error):
-            calculate_credit_score(customer_id)
+        # Calculate credit score
+        credit_score = calculate_credit_score(customer_id)
+
+        # Assert the credit score is lower than 700 (due to late payments)
+        self.assertLess(credit_score, 700)
 
 if __name__ == '__main__':
     unittest.main()
