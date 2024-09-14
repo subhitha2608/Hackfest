@@ -1,83 +1,100 @@
-py
+
 import unittest
 from unittest.mock import patch, Mock
-import pandas as pd
+from credit_score_calculator import credit_score_calculator
 
-class TestCalculateCreditScore(unittest.TestCase):
+class TestCreditScoreCalculator(unittest.TestCase):
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (100, 50, 20)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (10)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (1)
 
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    def test_calculate_credit_score(self, mock_text, mock_engine):
-        mock_engine.execute.return_value = [(100, 50, 20)]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [(100, 50, 20)]
+        result = credit_score_calculator(1)
 
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 500)
-
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    def test_calculate_credit_score_with_no_loans(self, mock_text, mock_engine):
-        mock_engine.execute.return_value = [()]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [()]
-
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 700)
-
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    def test_calculate_credit_score_with_no_credit_card(self, mock_text, mock_engine):
-        mock_engine.execute.return_value = [(100, 50, 20)]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [(100, 50, 20)]
-
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 500)
-
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    def test_calculate_credit_score_with_late_payments(self, mock_text, mock_engine):
-        mock_engine.execute.return_value = [(100, 50, 20), (1,)]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [(100, 50, 20), (1,)]
-
-        result = calculate_credit_score(1)
-        self.assertEqual(result, 400)
-
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    def test_calculate_credit_score_with_high_credit_utilization(self, mock_text, mock_engine):
-        mock_engine.execute.return_value = [(100, 50, 20), (1000,)]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [(100, 50, 20), (1000,)]
-
-        result = calculate_credit_score(1)
         self.assertEqual(result, 550)
 
-    @patch('config.engine')
-    @patch('sqlalchemy.text')
-    @patch('config.config')
-    def test_calculate_credit_score_log_result(self, mock_config, mock_text, mock_engine):
-        mock_engine.execute.return_value = [(100, 50, 20)]
-        mock_text.return_value = 'Mock query object'
-        mock_query = mock_text.return_value
-        mock_query.execution_options.return_value = Mock()
-        mock_query.fetchall.return_value = [(100, 50, 20)]
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score_zero_total_loan_amount(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (0, 0, 0)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (0)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (0)
 
-        calculate_credit_score(1)
+        result = credit_score_calculator(1)
 
-        mock_config.log_result.assert_called_once()
+        self.assertEqual(result, 700)
+
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score_low_credit_card_balance(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (100, 50, 20)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (0)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (1)
+
+        result = credit_score_calculator(1)
+
+        self.assertEqual(result, 650)
+
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score_high_late_pay_count(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (100, 50, 20)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (10)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (5)
+
+        result = credit_score_calculator(1)
+
+        self.assertEqual(result, 420)
+
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score_update_credit_score_database(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (100, 50, 20)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (10)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (1)
+
+        credit_score_calculator(1)
+
+        mock_query4.return_value = Mock()
+        mock_query4.execute.called_once_with({'p_customer_id': 1, 'v_credit_score': 420})
+
+    @patch('credit_score_calculator.engine.connect')
+    @patch('credit_score_calculator.text')
+    def test_calculate_credit_score_log_result_low_score(self, mock_text, mock_connect):
+        mock_connect.return_value = Mock()
+        mock_query.return_value = Mock()
+        mock_query.fetchone.return_value = (100, 50, 20)
+        mock_query2.return_value = Mock()
+        mock_query2.fetchone.return_value = (10)
+        mock_query3.return_value = Mock()
+        mock_query3.fetchone.return_value = (1)
+
+        credit_score_calculator(1)
+
+        mock_query5.return_value = Mock()
+        mock_query5.execute.called_once_with({'p_customer_id': 1, 'v_credit_score': 420})
 
 if __name__ == '__main__':
     unittest.main()

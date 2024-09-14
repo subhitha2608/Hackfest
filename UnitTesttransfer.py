@@ -1,60 +1,103 @@
 
 import unittest
-from your_file import process_payment
+from your_module import transfer_amount  # Replace 'your_module' with the actual name of the module that contains the `transfer_amount` function
+from config import engine
 
-class TestProcessPayment(unittest.TestCase):
+class TestTransferAmount(unittest.TestCase):
     def setUp(self):
-        self.p_sender = 1
-        self.p_receiver = 2
-        self.p_amount = 10
+        # Create a test database and tables
+        # Implement me!
 
-    def test_success(self):
-        result = process_payment(self.p_sender, self.p_receiver, self.p_amount)
-        assert result == "Payment processed successfully"
+    def tearDown(self):
+        # Drop the test database and tables
+        # Implement me!
 
-    def test_sender_account_not_found(self):
-        result = process_payment(3, self.p_receiver, self.p_amount)
-        assert result == "Payment processed successfully"
+    def test_transfer_amount_success(self):
+        # Test that the sender's balance is decreased and the receiver's balance is increased
+        sender_id = 1
+        receiver_id = 2
+        amount = 10
 
-    def test_receiver_account_not_found(self):
-        result = process_payment(self.p_sender, 3, self.p_amount)
-        assert result == "Payment processed successfully"
+        # Arrange
+        sender_balance_before = 100
+        receiver_balance_before = 0
 
-    def test_offset_amount_from_sender_account(self):
-        old_balance = 100
-        accounts = {'id': self.p_sender, 'balance': old_balance}
-        self.assertEqual(process_payment(self.p_sender, self.p_receiver, old_balance), "Payment processed successfully")
-        new_balance = accounts['balance']
-        self.assertEqual(new_balance, 0)
+        # Act
+        transfer_amount(sender_id, receiver_id, amount)
 
-    def test_add_amount_to_receiver_account(self):
-        old_balance = 0
-        accounts = {'id': self.p_receiver, 'balance': old_balance}
-        self.assertEqual(process_payment(self.p_sender, self.p_receiver, self.p_amount), "Payment processed successfully")
-        new_balance = accounts['balance']
-        self.assertEqual(new_balance, self.p_amount)
+        # Assert
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
+        self.assertEqual(result[0], sender_balance_before - amount)
 
-    def test_psb_connection_error(self):
-        import unittest.mock
-        with unittest.mock.patch('your_file.engine') as engine:
-            engine.connect.side_effect = psycopg2.Error('Connection failed')
-            with self.assertRaises(psycopg2.Error):
-                process_payment(self.p_sender, self.p_receiver, self.p_amount)
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
+        self.assertEqual(result[0], receiver_balance_before + amount)
 
-    def test_psb_query_error(self):
-        import unittest.mock
-        with unittest.mock.patch('your_file.engine') as engine:
-            engine.connect.return_value = unittest.mock.Mock()
-            engine.connect().execute.side_effect = psycopg2.Error('Query failed')
-            with self.assertRaises(psycopg2.Error):
-                process_payment(self.p_sender, self.p_receiver, self.p_amount)
+    def test_transfer_amount_insufficient_funds(self):
+        # Test that an exception is raised if the sender does not have enough funds
+        sender_id = 1
+        receiver_id = 2
+        amount = 10000
 
-    def test_db_connection_timeout(self):
-        import unittest.mock
-        with unittest.mock.patch('your_file.engine') as engine:
-            engine.connect.side_effect = psycopg2 OperationalError('connection timeout')
-            with self.assertRaises(psycopg2.OperationalError):
-                process_payment(self.p_sender, self.p_receiver, self.p_amount)
+        # Arrange
+        sender_balance_before = 50
+
+        # Act and Assert
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(sender_id, receiver_id, amount)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
+        self.assertEqual(result[0], sender_balance_before)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
+        self.assertIsNone(result)
+
+    def test_transfer_amount_invalid_sender_id(self):
+        # Test that an exception is raised if the sender ID is invalid
+        sender_id = 9999
+        receiver_id = 2
+        amount = 10
+
+        # Act and Assert
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(sender_id, receiver_id, amount)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
+        self.assertIsNone(result)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
+        self.assertIsNone(result)
+
+    def test_transfer_amount_invalid_receiver_id(self):
+        # Test that an exception is raised if the receiver ID is invalid
+        sender_id = 1
+        receiver_id = 9999
+        amount = 10
+
+        # Act and Assert
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(sender_id, receiver_id, amount)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
+        self.assertIsNone(result)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
+        self.assertIsNone(result)
+
+    def test_transfer_amount_edge_case_zero_amount(self):
+        # Test that an exception is raised if the transfer amount is zero
+        sender_id = 1
+        receiver_id = 2
+        amount = 0
+
+        # Act and Assert
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(sender_id, receiver_id, amount)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": sender_id}).fetchone()
+        self.assertIsNone(result)
+
+        result = engine.execute("SELECT balance FROM accounts WHERE id = :id", {"id": receiver_id}).fetchone()
+        self.assertIsNone(result)
 
 if __name__ == '__main__':
     unittest.main()
