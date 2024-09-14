@@ -1,47 +1,21 @@
-
+Python
 from config import engine
 from sqlalchemy import text
 import pandas as pd
 
-def transfer(p_sender, p_receiver, p_amount):
-    # Subtract the amount from the sender's account
-    update_sender = text("""
-        UPDATE accounts
-        SET balance = balance - :p_amount
-        WHERE id = :p_sender
-    """)
-    params = {'p_sender': p_sender, 'p_amount': p_amount}
+def transfer_money(sender_id, receiver_id, amount):
     conn = engine.connect()
-    conn.execute(update_sender, params)
-    conn.commit()
-
+    
+    # Subtract the amount from the sender's account
+    query = text("UPDATE accounts SET balance = balance - :amount WHERE id = :sender")
+    conn.execute(query, {'sender': sender_id, 'amount': amount})
+    
     # Add the amount to the receiver's account
-    update_receiver = text("""
-        UPDATE accounts
-        SET balance = balance + :p_amount
-        WHERE id = :p_receiver
-    """)
-    params = {'p_receiver': p_receiver, 'p_amount': p_amount}
-    conn.execute(update_receiver, params)
+    query = text("UPDATE accounts SET balance = balance + :amount WHERE id = :receiver")
+    conn.execute(query, {'receiver': receiver_id, 'amount': amount})
+    
+    # Commit the transaction
     conn.commit()
-
-    # Execute the query to get the final balance of accounts
-    get_balance = text("""
-        SELECT id, balance
-        FROM accounts
-        WHERE id = :p_sender
-    """)
-    params = {'p_sender': p_sender}
-    result = conn.execute(get_sender_balance, params)
-    sender_balance = result.fetchone()
     
-    get_balance = text("""
-        SELECT id, balance
-        FROM accounts
-        WHERE id = :p_receiver
-    """)
-    params = {'p_receiver': p_receiver}
-    result = conn.execute(get_balance, params)
-    receiver_balance = result.fetchone()
-    
-    return sender_balance, receiver_balance
+    # Close the connection
+    conn.close()
