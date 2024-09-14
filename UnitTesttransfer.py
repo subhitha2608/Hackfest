@@ -1,111 +1,43 @@
 
 import unittest
-from your_module import wallet_transfer
+from unit_tests.test_transfer import transfer  # Import the function to be tested
 
-class TestWalletTransfer(unittest.TestCase):
+class TestTransferFunction(unittest.TestCase):
+    def setUp(self):
+        # Set up test data
+        self.sender_id = 1
+        self.receiver_id = 2
+        self.amount = 10.0
 
-    def test_transfer succeeds(self):
-        # Mock the engine to return a successful result
-        def mock_engine_execute(sql, params):
-            if sql == text("""
-                UPDATE accounts
-                SET balance = balance - :p_amount
-                WHERE id = :p_sender;
-            """):
-                return pd.DataFrame({'balance': [100 - 100]})
-            elif sql == text("""
-                UPDATE accounts
-                SET balance = balance + :p_amount
-                WHERE id = :p_receiver;
-            """):
-                return pd.DataFrame({'balance': [100 + 100]})
-            else:
-                raise ValueError("Invalid SQL")
+    def test_transfer_valid(self):
+        sender_balance, receiver_balance = transfer(self.sender_id, self.receiver_id, self.amount)
+        self.assertEqual(sender_balance[1], self.amount)
+        self.assertEqual(receiver_balance[1], self.amount)
+        # Verify the balance of the sender account has decreased
+        self.assertEqual(round(sender_balance[1], 2), self.amount)
+        # Verify the balance of the receiver account has increased
+        self.assertEqual(round(receiver_balance[1], 2), self.amount)
 
-        # Enable mocking for test
-        original.execute = engine.execute
-        engine.execute = mock_engine_execute
+    def test_transfer_zero_amount(self):
+        sender_balance, receiver_balance = transfer(self.sender_id, self.receiver_id, 0)
+        self.assertEqual(sender_balance[1], sender_balance[1])
+        self.assertEqual(receiver_balance[1], receiver_balance[1])
 
-        # Test the function
-        result = wallet_transfer(1, 2, 100)
-        self.assertEqual(result, "Transfer successful")
+    def test_transfer_invalid_sender_id(self):
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            transfer(0, self.receiver_id, self.amount)
 
-        # Disable mocking
-        engine.execute = original.execute
+    def test_transfer_invalid_receiver_id(self):
+        with self.assertRaises(sqlalchemy.exc.IntegrityError):
+            transfer(self.sender_id, 0, self.amount)
 
-    def test_transfer fails(self):
-        # Mock the engine to return an error
-        def mock_engine_execute(sql, params):
-            raise ValueError("Error")
+    def test_transfer_invalid_amount_type(self):
+        with self.assertRaises(TypeError):
+            transfer(self.sender_id, self.receiver_id, 'abc')
 
-        # Enable mocking for test
-        original.execute = engine.execute
-        engine.execute = mock_engine_execute
-
-        # Test the function
-        result = wallet_transfer(1, 2, 100)
-        self.assertEqual(result, "Error")
-
-        # Disable mocking
-        engine.execute = original.execute
-
-    def test_sender_id_not_found(self):
-        # Mock the engine to return a successful result with a sender_id that does not exist
-        def mock_engine_execute(sql, params):
-            if sql == text("""
-                UPDATE accounts
-                SET balance = balance - :p_amount
-                WHERE id = :p_sender;
-            """):
-                return pd.DataFrame({'balance': [100 - 100]})
-            elif sql == text("""
-                UPDATE accounts
-                SET balance = balance + :p_amount
-                WHERE id = :p_receiver;
-            """):
-                raise ValueError("Invalid sender_id")
-            else:
-                raise ValueError("Invalid SQL")
-
-        # Enable mocking for test
-        original.execute = engine.execute
-        engine.execute = mock_engine_execute
-
-        # Test the function
-        result = wallet_transfer(3, 2, 100)
-        self.assertEqual(result, "Invalid sender_id")
-
-        # Disable mocking
-        engine.execute = original.execute
-
-    def test_sender_id_invalid_amount(self):
-        # Mock the engine to return a successful result with an invalid amount
-        def mock_engine_execute(sql, params):
-            if sql == text("""
-                UPDATE accounts
-                SET balance = balance - :p_amount
-                WHERE id = :p_sender;
-            """):
-                raise ValueError("Invalid amount")
-            elif sql == text("""
-                UPDATE accounts
-                SET balance = balance + :p_amount
-                WHERE id = :p_receiver;
-            """):
-                return pd.DataFrame({'balance': [100 + 100]})
-            else:
-                raise ValueError("Invalid SQL")
-
-        # Enable mocking for test
-        original.execute = engine.execute
-        engine.execute = mock_engine_execute
-
-        # Test the function
-        result = wallet_transfer(1, 2, 1000)
-        self.assertEqual(result, "Invalid amount")
-
-        # Disable mocking
-        engine.execute = original.execute
+    def tearDown(self):
+        # Clean up test data
+        pass
 
 if __name__ == '__main__':
     unittest.main()

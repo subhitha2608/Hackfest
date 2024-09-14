@@ -1,73 +1,100 @@
 
 import unittest
-from unittest.mock import patch, Mock
-from datetime import datetime, timedelta
+from unittest.mock import patch
+from your_module import create_repayment_schedule  # replace with the actual module name
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestRepaymentSchedule(unittest.TestCase):
+    @patch('your_module.engine')
+    @patch('your_module.conn')
+    def test_create_repayment_schedule(self, mock_conn, mock_engine):
+        loan_id = 123
+        loan_amount = 10000
+        interest_rate = 12
+        loan_term = 60
+        start_date = '2022-01-01'
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule(self, mock_engine):
-        loan_id = 1
-        loan_amount = 100000
-        interest_rate = 6
-        loan_term = 360
-        start_date = datetime.now()
+        def simulate_query.Result.__getitem__(self, index):
+            if index == 0:
+                return loan_amount
+            elif index == 1:
+                return interest_rate
+            elif index == 2:
+                return loan_term
+            elif index == 3:
+                return start_date
 
-        with mock_engine.connect() as conn:
-            conn.execute = Mock(return_value=[loan_amount, interest_rate/100/12, loan_term, start_date])
+        mock_result = MockResult(return_value=[loan_amount, interest_rate, loan_term, start_date])
+        mock_engine.return_value.connect.return_value = mock_conn
+        mock_conn.execute.return_value = mock_result
 
-        calculate_repayment_schedule(loan_id)
-        repayment_schedule_entries = [(1, 1, start_date, 0, 100000, 100000, 100000), 
-                                       (1, 2, start_date + timedelta(days=30), 0, 1499.97, 100000, 89801.03), 
-                                       (1, 3, start_date + timedelta(days=60), 0, 1499.97, 100000, 74801.06), 
-                                       ...
-                                       (1, 360, start_date + timedelta(days=35160), 0, 0, 100000, 0)]
+        create_repayment_schedule(loan_id)
 
-        mock_engine.execute.assert_any_call("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)", 
-                                             {"loan_id": 1, "payment_number": 1, "payment_date": start_date, "principal_amount": 0, "interest_amount": 500, "monthly_payment": 2679.68, "balance": 100000})
-        mock_engine.execute.assert_any_call("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)", 
-                                             {"loan_id": 1, "payment_number": 360, "payment_date": start_date + timedelta(days=35160), "principal_amount": 0, "interest_amount": 0, "monthly_payment": 2679.68, "balance": 0})
-        mock_engine.commit.assert_called_once()
+        self.assertEqual(mock_conn.execute.call_count, 2)
+        self.assertEqual(mock_conn.commit.call_count, 1)
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_no_loan_found(self, mock_engine):
-        loan_id = 1
-        with mock_engine.connect() as conn:
-            conn.execute = Mock(return_value=None)
-        
-        self.assertRaises(IndexError, calculate_repayment_schedule, loan_id)
-        mock_engine.execute.assert_called_once()
+    @patch('your_module.engine')
+    @patch('your_module.conn')
+    def test_create_repayment_schedule_error(self, mock_conn, mock_engine):
+        loan_id = 123
+        error = 'Database error'
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_database_error(self, mock_engine):
-        loan_id = 1
-        with mock_engine.connect() as conn:
-            conn.execute = Mock(side_effect=Exception("Database Error"))
-        
-        self.assertRaises(Exception, calculate_repayment_schedule, loan_id)
-        mock_engine.execute.assert_called_once()
+        mock_engine.return_value.connect.return_value = mock_conn
+        mock_conn.execute.side_effect = Exception(error)
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_invalid_loan_term(self, mock_engine):
-        loan_id = 1
-        invalid_loan_term = -1
-        with mock_engine.connect() as conn:
-            conn.execute = Mock(return_value=[100000, 6/100/12, invalid_loan_term, datetime.now()])
-        
-        with self.assertRaises(IndexError):
-            calculate_repayment_schedule(loan_id)
-        mock_engine.execute.assert_called_once()
+        with self.assertRaises(Exception) as cm:
+            create_repayment_schedule(loan_id)
+        self.assertEqual(str(cm.exception), error)
 
-    @patch('config.engine')
-    def test_calculate_repayment_schedule_invalid_interest_rate(self, mock_engine):
-        loan_id = 1
-        invalid_interest_rate = 12
-        with mock_engine.connect() as conn:
-            conn.execute = Mock(return_value=[100000, invalid_interest_rate/100/12, 360, datetime.now()])
-        
-        with self.assertRaises(IndexError):
-            calculate_repayment_schedule(loan_id)
-        mock_engine.execute.assert_called_once()
+    @patch('your_module.engine')
+    @patch('your_module.conn')
+    def test_create_repayment_schedule_empty_result(self, mock_conn, mock_engine):
+        loan_id = 123
+        result = []
+
+        mock_engine.return_value.connect.return_value = mock_conn
+        mock_conn.execute.return_value = result
+
+        with self.assertRaises(IndexError) as cm:
+            create_repayment_schedule(loan_id)
+        self.assertEqual(str(cm.exception), 'list index out of range')
+
+    @patch('your_module.engine')
+    @patch('your_module.conn')
+    def test_create_repayment_schedule_multiple_loans(self, mock_conn, mock_engine):
+        loan_id = 123
+        loan_amount = 10000
+        interest_rate = 12
+        loan_term = 60
+        start_date = '2022-01-01'
+
+        def simulate_query(Result.__getitem__, self, index):
+            if index == 0:
+                return loan_amount
+            elif index == 1:
+                return interest_rate
+            elif index == 2:
+                return loan_term
+            elif index == 3:
+                return start_date
+
+        mock_result = MockResult(return_value=[loan_amount, interest_rate, loan_term, start_date])
+        mock_engine.return_value.connect.return_value = mock_conn
+        mock_conn.execute.return_value = [mock_result, mock_result]
+
+        create_repayment_schedule(loan_id)
+
+        self.assertEqual(mock_conn.execute.call_count, 4)
+        self.assertEqual(mock_conn.commit.call_count, 1)
+
+class MockResult:
+    def __init__(self, return_value):
+        self.return_value = return_value
+
+    def fetchone(self):
+        return self.return_value
+
+    def __getitem__(self, index):
+        return self.return_value[index]
 
 if __name__ == '__main__':
     unittest.main()

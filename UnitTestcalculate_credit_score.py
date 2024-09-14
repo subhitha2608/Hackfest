@@ -1,43 +1,55 @@
 
 import unittest
-from your_file import update_customer_credit_score  # Replace 'your_file' with the actual filename
+from mock import patch
+from your_module import update_customer_credit_score  # Replace with the actual module name
 
 class TestUpdateCustomerCreditScore(unittest.TestCase):
-    # Test 1: Happy path with a valid customer ID
-    def test_update_customer_credit_score_valid(self):
-        v_credit_score = update_customer_credit_score(1)
-        self.assertGreaterEqual(v_credit_score, 300)
-        self.assertLessEqual(v_credit_score, 850)
 
-    # Test 2: Happy path with a customer ID and no loans
-    def test_update_customer_credit_score_no_loans(self):
-        v_credit_score = update_customer_credit_score(2)
-        self.assertEqual(v_credit_score, 650)
+    @patch('engine.execute')
+    def test_positive_score(self, mock_execute):
+        mock_execute.side_effect = [
+            1000.0, 800.0, 200.0, 100.0, 5
+        ]
+        self.assertEqual(update_customer_credit_score(1), 525)
 
-    # Test 3: Happy path with a customer ID and low credit card balance
-    def test_update_customer_credit_score_low_credit_card_balance(self):
-        v_credit_score = update_customer_credit_score(3)
-        self.assertEqual(v_credit_score, 700)
+    @patch('engine.execute')
+    def test_negative_score(self, mock_execute):
+        mock_execute.side_effect = [
+            0, 0, 0, 0, 5
+        ]
+        self.assertEqual(update_customer_credit_score(1), 300)
 
-    # Test 4: Happy path with a customer ID and high late payment count
-    def test_update_customer_credit_score_high_late_payment_count(self):
-        v_credit_score = update_customer_credit_score(4)
-        self.assertEqual(v_credit_score, 250)
+    @patch('engine.execute')
+    def test_no_loans(self, mock_execute):
+        mock_execute.side_effect = [
+            0.0, 0.0, 0.0, 0, 100.0
+        ]
+        self.assertEqual(update_customer_credit_score(1), 350)
 
-    # Test 5: Test with a customer ID and all loans repaid
-    def test_update_customer_credit_score_all_loans_repaid(self):
-        v_credit_score = update_customer_credit_score(5)
-        self.assertEqual(v_credit_score, 850)
+    @patch('engine.execute')
+    def test_no_credit_card(self, mock_execute):
+        mock_execute.side_effect = [
+            1000.0, 800.0, 0, 0, 5
+        ]
+        self.assertEqual(update_customer_credit_score(1), 650)
 
-    # Test 6: Test with a customer ID and a credit score below 500
-    def test_update_customer_credit_score_low_credit_score(self):
-        v_credit_score = update_customer_credit_score(6)
-        self.assertLess(v_credit_score, 500)
+    @patch('engine.execute')
+    def test_late_payments(self, mock_execute):
+        mock_execute.side_effect = [
+            1000.0, 800.0, 0, 5, 5
+        ]
+        self.assertEqual(update_credit_score(1), 375)
 
-    # Test 7: Test with an invalid customer ID (throwing an exception)
-    def test_update_customer_credit_score_invalid(self):
-        with self.assertRaises(psycopg2.Error):
-            update_customer_credit_score(999)
+    @patch('engine.execute')
+    def test_log_credit_score(self, mock_execute):
+        mock_execute.side_effect = [
+            100.0, 50.0, 0, 5, 5
+        ]
+        with patch('your_module.log') as mock_log:
+            update_customer_credit_score(1)
+            mock_log.assert_called()
+
+    # Add more tests as needed
 
 if __name__ == '__main__':
     unittest.main()
