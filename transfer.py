@@ -4,32 +4,32 @@ import sqlalchemy as sa
 import pandas as pd
 import psycopg2
 
-def transfer_amount(p_sender, p_receiver, p_amount):
+def transfer_funds(p_sender, p_receiver, p_amount):
     conn = engine.connect()
-    trans = conn.begin()
 
     try:
         # Subtract the amount from the sender's account
-        update_sender_query = text("""
+        update_sender_query = sa.text("""
             UPDATE accounts
             SET balance = balance - :amount
-            WHERE id = :sender
+            WHERE id = :sender;
         """)
-        conn.execute(update_sender_query, {'amount': p_amount, 'sender': p_sender})
+        conn.execute(update_sender_query, {'sender': p_sender, 'amount': p_amount})
 
         # Add the amount to the receiver's account
-        update_receiver_query = text("""
+        update_receiver_query = sa.text("""
             UPDATE accounts
             SET balance = balance + :amount
-            WHERE id = :receiver
+            WHERE id = :receiver;
         """)
-        conn.execute(update_receiver_query, {'amount': p_amount, 'receiver': p_receiver})
+        conn.execute(update_receiver_query, {'receiver': p_receiver, 'amount': p_amount})
 
-        trans.commit()
+        conn.commit()
+
     except psycopg2.Error as e:
-        trans.rollback()
+        conn.rollback()
         raise e
     finally:
         conn.close()
 
-    return None  # or return a success message if needed
+    return None  # Return None as the function does not return any result

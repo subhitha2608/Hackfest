@@ -1,86 +1,89 @@
 
 import unittest
+from your_module import transfer_funds  # Replace 'your_module' with the actual module name
+from config import engine
+import sqlalchemy as sa
+import pandas as pd
 import psycopg2
-from psycopg2.extensions import ISOLATION_LEVEL_AUTOCOMMIT
-from your_module import get_user_data, create_user, delete_user  # Import the functions to be tested
 
-class TestUserData(unittest.TestCase):
-    @classmethod
-    def setUpClass(cls):
-        cls.conn = psycopg2.connect(
-            host="localhost",
-            database="test_db",
-            user="test_user",
-            password="test_password"
-        )
-        cls.conn.set_isolation_level(ISOLATION_LEVEL_AUTOCOMMIT)
-        cls.cursor = cls.conn.cursor()
+class TestTransferFunds(unittest.TestCase):
+    def setUp(self):
+        # Create a test database connection
+        self.conn = engine.connect()
 
-        # Create a test table
-        cls.cursor.execute("CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name VARCHAR(50), email VARCHAR(100))")
+    def tearDown(self):
+        # Rollback any changes and close the connection
+        self.conn.rollback()
+        self.conn.close()
 
-    @classmethod
-    def tearDownClass(cls):
-        # Drop the test table
-        cls.cursor.execute("DROP TABLE IF EXISTS users")
-        cls.conn.close()
+    def test_transfer_funds SuccessfulTransfer(self):
+        # Create test accounts with initial balances
+        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
 
-    def test_get_user_data_valid_input(self):
-        # Create a test user
-        create_user("John Doe", "john@example.com")
-        self.cursor.execute("SELECT * FROM users WHERE name='John Doe'")
-        user_data = self.cursor.fetchone()
+        # Transfer 20 from account 1 to account 2
+        transfer_funds(1, 2, 20)
 
-        # Test get_user_data function
-        result = get_user_data(user_data[0])
-        print("Result:", result)
-        self.assertIsNotNone(result)
-        self.assertEqual(result["name"], "John Doe")
-        self.assertEqual(result["email"], "john@example.com")
+        # Check the updated balances
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()
+        self.assertEqual(result[0], 80)
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()
+        self.assertEqual(result[0], 70)
 
-    def test_get_user_data_invalid_input(self):
-        # Test with non-existent user ID
-        result = get_user_data(999)
-        print("Result:", result)
-        self.assertIsNone(result)
+    def test_transfer_funds_InsufficientBalance(self):
+        # Create test accounts with initial balances
+        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
 
-    def test_create_user_valid_input(self):
-        # Test create_user function
-        create_user("Jane Doe", "jane@example.com")
-        self.cursor.execute("SELECT * FROM users WHERE name='Jane Doe'")
-        user_data = self.cursor.fetchone()
-        print("Result:", user_data)
-        self.assertIsNotNone(user_data)
-        self.assertEqual(user_data[1], "Jane Doe")
-        self.assertEqual(user_data[2], "jane@example.com")
-
-    def test_create_user_invalid_input(self):
-        # Test with invalid email
+        # Try to transfer 150 from account 1 to account 2 (should raise an error)
         with self.assertRaises(psycopg2.Error):
-            create_user("Invalid User", "invalid_email")
-        print("Error caught!")
+            transfer_funds(1, 2, 150)
 
-        # Test with existing user
+        # Check that the balances remain unchanged
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()
+        self.assertEqual(result[0], 100)
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()
+        self.assertEqual(result[0], 50)
+
+    def test_transfer_funds_NegativeAmount(self):
+        # Create test accounts with initial balances
+        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
+
+        # Try to transfer -20 from account 1 to account 2 (should raise an error)
         with self.assertRaises(psycopg2.Error):
-            create_user("John Doe", "john@example.com")
-        print("Error caught!")
+            transfer_funds(1, 2, -20)
 
-    def test_delete_user_valid_input(self):
-        # Create a test user
-        create_user("Test User", "test@example.com")
+        # Check that the balances remain unchanged
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()
+        self.assertEqual(result[0], 100)
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()
+        self.assertEqual(result[0], 50)
 
-        # Test delete_user function
-        delete_user(1)  # Assuming ID 1 is the test user
-        self.cursor.execute("SELECT * FROM users WHERE name='Test User'")
-        user_data = self.cursor.fetchone()
-        print("Result:", user_data)
-        self.assertIsNone(user_data)
+    def test_transfer_funds_NonExistingSender(self):
+        # Create test accounts with initial balances
+        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
 
-    def test_delete_user_invalid_input(self):
-        # Test with non-existent user ID
+        # Try to transfer 20 from non-existing account 3 to account 2 (should raise an error)
         with self.assertRaises(psycopg2.Error):
-            delete_user(999)
-        print("Error caught!")
+            transfer_funds(3, 2, 20)
 
-if __name__ == "__main__":
+        # Check that the balances remain unchanged
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()
+        self.assertEqual(result[0], 100)
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()
+        self.assertEqual(result[0], 50)
+
+    def test_transfer_funds_NonExistingReceiver(self):
+        # Create test accounts with initial balances
+        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
+
+        # Try to transfer 20 from account 1 to non-existing account 3 (should raise an error)
+        with self.assertRaises(psycopg2.Error):
+            transfer_funds(1, 3, 20)
+
+        # Check that the balances remain unchanged
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()
+        self.assertEqual(result[0], 100)
+        result = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()
+        self.assertEqual(result[0], 50)
+
+if __name__ == '__main__':
     unittest.main()

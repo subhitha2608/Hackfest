@@ -5,21 +5,18 @@ import pandas as pd
 import psycopg2
 
 def calculate_credit_score(customer_id):
-    # Create a connection object
     conn = engine.connect()
 
-    # Step 1: Calculate total loan amount, total repayment, and outstanding balance
+    # Step 1: Calculate the customer's total loan amount, total repayment, and outstanding balance
     query = sa.text("""
-        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-               COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-               COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
+        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), COALESCE(ROUND(SUM(repayment_amount), 2), 0), COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
         FROM loans
         WHERE loans.customer_id = :customer_id
     """)
     result = conn.execute(query, {'customer_id': customer_id})
     total_loan_amount, total_repayment, outstanding_loan_balance = result.fetchone()
 
-    # Step 2: Get current credit card balance
+    # Step 2: Get the current credit card balance
     query = sa.text("""
         SELECT COALESCE(ROUND(SUM(balance), 2), 0)
         FROM credit_cards
@@ -28,7 +25,7 @@ def calculate_credit_score(customer_id):
     result = conn.execute(query, {'customer_id': customer_id})
     credit_card_balance, = result.fetchone()
 
-    # Step 3: Count late payments
+    # Step 3: Count the number of late payments
     query = sa.text("""
         SELECT COUNT(*)
         FROM payments
@@ -37,7 +34,7 @@ def calculate_credit_score(customer_id):
     result = conn.execute(query, {'customer_id': customer_id})
     late_pay_count, = result.fetchone()
 
-    # Step 4: Basic rule-based calculation of credit score
+    # Step 4: Basic rule-based calculation of the credit score
     v_credit_score = 0
     if total_loan_amount > 0:
         v_credit_score += round((total_repayment / total_loan_amount) * 400, 2)
@@ -49,15 +46,14 @@ def calculate_credit_score(customer_id):
     else:
         v_credit_score += 300
 
-    v_credit_score -= (late_pay_count * 50)
+    v_credit_score -= late_pay_count * 50
 
-    # Ensure the score stays within reasonable bounds
     if v_credit_score < 300:
         v_credit_score = 300
     elif v_credit_score > 850:
         v_credit_score = 850
 
-    # Update customer credit score
+    # Update the customer's credit score
     query = sa.text("""
         UPDATE customers
         SET credit_score = :credit_score
@@ -75,5 +71,5 @@ def calculate_credit_score(customer_id):
         conn.execute(query, {'customer_id': customer_id, 'credit_score': round(v_credit_score, 0)})
         conn.commit()
 
-    # Return the final credit score
+    conn.close()
     return round(v_credit_score, 0)

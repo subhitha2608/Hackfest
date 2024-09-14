@@ -1,76 +1,65 @@
 
 import unittest
+from your_module import calculate_repayment_schedule  # Replace 'your_module' with the actual module name
+import sqlalchemy as sa
+import pandas as pd
 import psycopg2
 
-class TestGetUser(unittest.TestCase):
+class TestCalculateRepaymentSchedule(unittest.TestCase):
     def setUp(self):
-        self.conn = psycopg2.connect(
-            host="localhost",
-            database="test_db",
-            user="test_user",
-            password="test_password"
-        )
-        self.cur = self.conn.cursor()
-        self.create_table_query = "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, username VARCHAR(50), email VARCHAR(100))"
-        self.cur.execute(self.create_table_query)
-        self.conn.commit()
+        # Create a test database connection
+        self.conn = engine.connect()
 
     def tearDown(self):
-        self.drop_table_query = "DROP TABLE IF EXISTS users"
-        self.cur.execute(self.drop_table_query)
-        self.conn.commit()
-        self.cur.close()
+        # Close the test database connection
         self.conn.close()
 
-    def test_get_user_by_id_valid_input(self):
-        self.insert_user_query = "INSERT INTO users (username, email) VALUES (%s, %s) RETURNING id"
-        self.cur.execute(self.insert_user_query, ("test_user", "test@example.com"))
-        user_id = self.cur.fetchone()[0]
-        self.conn.commit()
+    def test_valid_loan_id(self):
+        # Test with a valid loan ID
+        loan_id = 1
+        result = calculate_repayment_schedule(loan_id)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertGreater(len(result), 0)
 
-        from your_module import get_user
-        user = get_user(user_id)
-        self.assertIsNotNone(user)
-        self.assertEqual(user["id"], user_id)
-        self.assertEqual(user["username"], "test_user")
-        self.assertEqual(user["email"], "test@example.com")
-        print(f"User retrieved: {user}")
+    def test_invalid_loan_id(self):
+        # Test with an invalid loan ID
+        loan_id = -1
+        with self.assertRaises(sa.exc.NoResultFound):
+            calculate_repayment_schedule(loan_id)
 
-    def test_get_user_by_id_invalid_input(self):
-        from your_module import get_user
-        with self.assertRaises(ValueError):
-            get_user(-1)
-        print("Error: User ID should be a positive integer")
+    def test_loan_id_not_found(self):
+        # Test with a loan ID that doesn't exist in the database
+        loan_id = 999
+        with self.assertRaises(sa.exc.NoResultFound):
+            calculate_repayment_schedule(loan_id)
 
-    def test_get_user_by_id_non_existent(self):
-        from your_module import get_user
-        user = get_user(1000)
-        self.assertIsNone(user)
-        print("User not found")
+    def test_interest_rate_zero(self):
+        # Test with a loan that has an interest rate of 0%
+        loan_id = 2  # Assume loan ID 2 has an interest rate of 0%
+        result = calculate_repayment_schedule(loan_id)
+        self.assertIsInstance(result, pd.DataFrame)
+        self.assertGreater(len(result), 0)
 
-    def test_get_user_by_username_valid_input(self):
-        self.insert_user_query = "INSERT INTO users (username, email) VALUES (%s, %s)"
-        self.cur.execute(self.insert_user_query, ("test_user", "test@example.com"))
-        self.conn.commit()
+    def test_loan_term_zero(self):
+        # Test with a loan that has a term of 0 months
+        loan_id = 3  # Assume loan ID 3 has a term of 0 months
+        with self.assertRaises(ZeroDivisionError):
+            calculate_repayment_schedule(loan_id)
 
-        from your_module import get_user
-        user = get_user(username="test_user")
-        self.assertIsNotNone(user)
-        self.assertEqual(user["username"], "test_user")
-        self.assertEqual(user["email"], "test@example.com")
-        print(f"User retrieved: {user}")
+    def test_repayment_schedule_columns(self):
+        # Test that the repayment schedule has the correct columns
+        loan_id = 1
+        result = calculate_repayment_schedule(loan_id)
+        expected_columns = ['paymentnumber', 'paymentdate', 'principalamount', 'interestamount', 'totalpayment', 'balance']
+        self.assertCountEqual(result.columns, expected_columns)
 
-    def test_get_user_by_username_invalid_input(self):
-        from your_module import get_user
-        with self.assertRaises(ValueError):
-            get_user(username="")
-        print("Error: Username should not be empty")
+    def test_repayment_schedule_data(self):
+        # Test that the repayment schedule has reasonable data
+        loan_id = 1
+        result = calculate_repayment_schedule(loan_id)
+        self.assertGreater(result['principalamount'].sum(), 0)
+        self.assertGreater(result['interestamount'].sum(), 0)
+        self.assertGreater(result['totalpayment'].sum(), 0)
 
-    def test_get_user_by_username_non_existent(self):
-        from your_module import get_user
-        user = get_user(username="non_existent_user")
-        self.assertIsNone(user)
-        print("User not found")
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     unittest.main()
