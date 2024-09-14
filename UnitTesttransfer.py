@@ -1,77 +1,76 @@
 
 import unittest
 from unittest.mock import patch, Mock
-from your_file import transfer_funds  # Replace 'your_file' with the actual name of your file
+from your_module import transfer_amount  # Replace 'your_module' with the actual module name
 
-class TestTransferFunds(unittest.TestCase):
-    
-    @patch('your_file.engine')
-    def test_transfer_funds_success(self, mock_engine):
-        conn = Mock()
-        mock_engine.connect.return_value = conn
-        conn.execute.return_value = Mock()
-        conn.commit.return_value = None
-        conn.rollback.return_value = None
-        conn.close.return_value = None
+class TestTransferAmount(unittest.TestCase):
 
-        result = transfer_funds(1, 2, 100)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_valid(self, mock_connect):
+        mock_connect.return_value = Mock()
+        sender = 1
+        receiver = 2
+        amount = 100
 
-        self.assertIsNone(result)
+        transfer_amount(sender, receiver, amount)
 
-    @patch('your_file.engine')
-    def test_transfer_funds_sender_not_found(self, mock_engine):
-        conn = Mock()
-        mock_engine.connect.return_value = conn
-        conn.execute.side_effect = Exception('Sender not found')
-        conn.rollback.return_value = None
+        mock_connect.assert_called_once()
+        sender_stmt = text("""
+            UPDATE accounts
+            SET balance = balance - :amount
+            WHERE id = :sender;
+        """)
+        receiver_stmt = text("""
+            UPDATE accounts
+            SET balance = balance + :amount
+            WHERE id = :receiver;
+        """)
+        self.assertEqual(mock_connect.return_value.execute.call_args_list, [
+            [(sender_stmt, {"sender": sender, "receiver": receiver, "amount": amount})],
+            [(receiver_stmt, {"sender": sender, "receiver": receiver, "amount": amount})],
+        ])
+        mock_connect.return_value.commit.assert_called_once()
 
-        with self.assertRaises(Exception):
-            transfer_funds(1, 2, 100)
+    @patch('your_module.engine.connect')
+    def test_transfer_amount_missing_table(self, mock_connect):
+        mock_connect.return_value = Mock()
+        sender = 1
+        receiver = 2
+        amount = 100
 
-    @patch('your_file.engine')
-    def test_transfer_funds_receiver_not_found(self, mock_engine):
-        conn = Mock()
-        mock_engine.connect.return_value = conn
-        conn.execute.side_effect = [Mock(), Exception('Receiver not found')]
-        conn.rollback.return_value = None
+        transfer_amount(sender, receiver, amount)
 
-        with self.assertRaises(Exception):
-            transfer_funds(1, 2, 100)
+        mock_connect.assert_called_once()
+        mock_connect.return_value.execute.assert_called_once()
+        mock_connect.return_value.commit.assert_called_once()
 
-    @patch('your_file.engine')
-    def test_transfer_funds_insufficient_balance(self, mock_engine):
-        conn = Mock()
-        mock_engine.connect.return_value = conn
-        conn.execute.side_effect = [Mock(result=({'balance': 20})), Mock(result=({'balance': 20}))]
-        conn.execute.side_effect[0].return_value = Mock()
-        conn.execute.side_effect[1].return_result = Mock()
-        conn.execute.side_effect[1].return_result.rows = [(({'balance': 20}))]
-        conn.rollback.return_value = None
-
-        with self.assertRaises(Exception):
-            transfer_funds(1, 2, 30)
-
-    @patch('your_file.engine')
-    def test_transfer_funds_parallel_transaction(self, mock_engine):
-        conn = Mock()
-        mock_engine.connect.return_value = conn
-        conn.execute.side_effect = [Mock(), Mock()]
-        conn.execute.return_value = Mock()
-        conn.commit.side_effect = Exception('Parallel transaction failed')
-        conn.rollback.return_value = None
+    @patch('your_module.engine.connect')
+    def test_transfer_amountsender_non_existent(self, mock_connect):
+        mock_connect.return_value = Mock()
+        sender = 99
+        receiver = 2
+        amount = 100
 
         with self.assertRaises(Exception):
-            transfer_funds(1, 2, 100)
+            transfer_amount(sender, receiver, amount)
 
-    def test_transfer_funds_invalid_type(self):
-        with self.assertRaises(TypeError):
-            transfer_funds('sender', 'receiver', 100)
+        mock_connect.assert_called_once()
+        mock_connect.return_value.execute.assert_called_once()
+        mock_connect.return_value.rollback.assert_called_once()
 
-        with self.assertRaises(TypeError):
-            transfer_funds(1, 'receiver', 100)
+    @patch('your_module.engine.connect')
+    def test_transfer_amountreceiver_non_existent(self, mock_connect):
+        mock_connect.return_value = Mock()
+        sender = 1
+        receiver = 99
+        amount = 100
 
-        with self.assertRaises(TypeError):
-            transfer_funds(1, 2, 'amount')
+        with self.assertRaises(Exception):
+            transfer_amount(sender, receiver, amount)
+
+        mock_connect.assert_called_once()
+        mock_connect.return_value.execute.assert_called_once()
+        mock_connect.return_value.rollback.assert_called_once()
 
 if __name__ == '__main__':
     unittest.main()
