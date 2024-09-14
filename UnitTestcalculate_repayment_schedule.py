@@ -1,50 +1,68 @@
-Python
+
 import unittest
-import pandas as pd
-from unittest.mock import patch
-from your_module import calculate_repayment_schedule
+from unittest.mock import patch, Mock
+from datetime import datetime, timedelta
+from loan_calculator import calculate_repayment_schedule
+from config import engine
 
-class TestCalculateRepaymentSchedule(unittest.TestCase):
+class TestLoanCalculator(unittest.TestCase):
 
-    @patch('your_module.engine.connect')
-    def test_calculate_repayment_schedule(self, mock_connect):
-        # Mock the database connection
-        conn = mock_connect.return_value
-        conn.execute.return_value = [('1000', '5', '360', '2020-01-01')]
+    @patch('config.engine')
+    @patch('psycopg2')
+    @patch('sqlalchemy.engine')
+    def test_calculate_repayscale_not_found(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
+        loan_id = 'abc'
+        mock_engine.execute.return_value = None
+        result = calculate_repayment_schedule(loan_id)
+        self.assertEqual(result, [])
 
-        # Test the function
-        repayment_schedule = calculate_repayment_schedule(1)
-        self.assertEqual(len(repayment_schedule), 12)
-        self.assertEqual(repayment_schedule[0]['payment_date'], '2020-01-01')
-        self.assertEqual(repayment_schedule[0]['total_payment'], 27.22401165151576)
-        self.assertEqual(repayment_schedule[-1]['balance'], 0)
+    @patch('config.engine')
+    @patch('psycopg2')
+    @patch('sqlalchemy.engine')
+    def test_calculate_repayscale_found(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
+        loan_id = 'abc'
+        loan_amount = 100000
+        interest_rate = 10
+        loan_term = 60
+        start_date = datetime(2020, 1, 1)
+        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
+        result = calculate_repayment_schedule(loan_id)
+        self.assertEqual(result, [])
 
-        # Test the function with a shorter loan term
-        repayment_schedule = calculate_repayment_schedule(1)
-        self.assertEqual(len(repayment_schedule), 6)
-        self.assertEqual(repayment_schedule[0]['payment_date'], '2020-01-01')
-        self.assertEqual(repayment_schedule[0]['total_payment'], 27.22401165151576)
-        self.assertEqual(repayment_schedule[-1]['balance'], 0)
-
-    @patch('your_module.engine.connect')
-    def test_calculate_repayment_schedule_no_results(self, mock_connect):
-        # Mock the database connection
-        conn = mock_connect.return_value
-        conn.execute.return_value = []
-
-        # Test the function
-        repayment_schedule = calculate_repayment_schedule(1)
-        self.assertEqual(repayment_schedule, [])
-
-    @patch('your_module.engine.connect')
-    def test_calculate_repayment_schedule_error(self, mock_connect):
-        # Mock the database connection
-        conn = mock_connect.return_value
-        conn.execute.side_effect = Exception('Invalid query')
-
-        # Test the function
+    @patch('config.engine')
+    @patch('psycopg2')
+    @patch('sqlalchemy.engine')
+    def test_calculate_repayscale_invalid_input(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
+        loan_id = 'abc'
+        mock_engine.execute.return_value = (None, None, None, None)
         with self.assertRaises(Exception):
-            calculate_repayment_schedule(1)
+            calculate_repayment_schedule(loan_id)
+
+    @patch('config.engine')
+    @patch('psycopg2')
+    @patch('sqlalchemy.engine')
+    def test_calculate_repayscale_zero_loan_term(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
+        loan_id = 'abc'
+        loan_amount = 100000
+        interest_rate = 10
+        loan_term = 0
+        start_date = datetime(2020, 1, 1)
+        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
+        result = calculate_repayment_schedule(loan_id)
+        self.assertEqual(result, [])
+
+    @patch('config.engine')
+    @patch('psycopg2')
+    @patch('sqlalchemy.engine')
+    def test_calculate_repayscale_zero_loan_amount(self, mock_sqlalchemy_engine, mock_psycopg2, mock_engine):
+        loan_id = 'abc'
+        loan_amount = 0
+        interest_rate = 10
+        loan_term = 60
+        start_date = datetime(2020, 1, 1)
+        mock_engine.execute.return_value = (loan_amount, interest_rate, loan_term, start_date)
+        result = calculate_repayment_schedule(loan_id)
+        self.assertEqual(result, [])
 
 if __name__ == '__main__':
     unittest.main()

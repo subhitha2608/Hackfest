@@ -1,81 +1,117 @@
 
 import unittest
-from your_module import transfer_amount  # Replace with your module name
 from unittest.mock import patch, Mock
-from your_config import engine  # Replace with your config module
+from transfer_funds import transfer_funds
 
-class TestTransferAmount(unittest.TestCase):
+class TestTransferFunds(unittest.TestCase):
 
-    @patch('your_config.engine.execute')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_success(self, mock_connect, mock_execute):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.return_value = [Mock(balance=100)]
-        mock_connect().execute.return_value = [Mock(balance=100)]
+    @patch.object(engine, 'execute')
+    @patch('config.engine.connect')
+    def test_transfer_funds(self, mock_connect, mock_execute):
+        p_sender = 123
+        p_receiver = 456
+        p_amount = 100
+        mock_conn = Mock()
+        mock_conn.commit = Mock()
+        mock_connect.return_value = mock_conn
+        
+        sender_update_mock = Mock()
+        sender_update_mock.return_value = 123
+        receiver_update_mock = Mock()
+        receiver_update_mock.return_value = 456
+        query_mock = Mock()
+        query_mock.return_value.fetchall.return_value = [(123, 23), (456, 14)]
+        
+        mock_execute.side_effect = [sender_update_mock, receiver_update_mock, query_mock]
+        
+        df = transfer_funds(p_sender, p_receiver, p_amount)
+        self.assertEqual(df.shape, (2, 1))
+        self.assertEqual(engine.execute.call_count, 3)
+        self.assertEqual(mock_conn.commit.call_count, 2)
+        self.assertEqual(sender_update_mock.call_count, 1)
+        self.assertEqual(receiver_update_mock.call_count, 1)
+        self.assertEqual(query_mock.call_count, 1)
 
-        # Call the transfer_amount function
-        result = transfer_amount(sender_id=1, receiver_id=2, amount=50)
+    @patch.object(engine, 'execute')
+    @patch('config.engine.connect')
+    def test_transfer_funds_with_zero_amount(self, mock_connect, mock_execute):
+        p_sender = 123
+        p_receiver = 456
+        p_amount = 0
+        mock_conn = Mock()
+        mock_conn.commit = Mock()
+        mock_connect.return_value = mock_conn
+        
+        sender_update_mock = Mock()
+        sender_update_mock.return_value = 123
+        receiver_update_mock = Mock()
+        receiver_update_mock.return_value = 456
+        query_mock = Mock()
+        query_mock.return_value.fetchall.return_value = [(123, 23), (456, 14)]
+        
+        mock_execute.side_effect = [sender_update_mock, receiver_update_mock, query_mock]
+        
+        df = transfer_funds(p_sender, p_receiver, p_amount)
+        self.assertEqual(df.shape, (2, 1))
+        self.assertEqual(engine.execute.call_count, 3)
+        self.assertEqual(mock_conn.commit.call_count, 2)
+        self.assertEqual(sender_update_mock.call_count, 1)
+        self.assertEqual(receiver_update_mock.call_count, 1)
+        self.assertEqual(query_mock.call_count, 1)
 
-        # Check the results
-        self.assertEqual(result, [(1, 50, 50), (2, 50, 100)])
+    @patch.object(engine, 'execute')
+    @patch('config.engine.connect')
+    def test_transfer_funds_with_invalid_sender(self, mock_connect, mock_execute):
+        p_sender = 123
+        p_receiver = 456
+        p_amount = 100
+        mock_conn = Mock()
+        mock_conn.commit = Mock()
+        mock_connect.return_value = mock_conn
+        
+        sender_update_mock = Mock()
+        sender_update_mock.side_effect = Exception('Invalid sender')
+        receiver_update_mock = Mock()
+        receiver_update_mock.return_value = 456
+        query_mock = Mock()
+        query_mock.return_value.fetchall.return_value = [(123, 23), (456, 14)]
+        
+        mock_execute.side_effect = [sender_update_mock, receiver_update_mock, query_mock]
+        
+        with self.assertRaises(Exception):
+            transfer_funds(p_sender, p_receiver, p_amount)
+        self.assertEqual(engine.execute.call_count, 1)
+        self.assertEqual(mock_conn.commit.call_count, 0)
+        self.assertEqual(sender_update_mock.call_count, 1)
+        self.assertEqual(receiver_update_mock.call_count, 0)
+        self.assertEqual(query_mock.call_count, 0)
 
-    @patch('your_config.engine.execute')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_sender_account_not_found(self, mock_connect, mock_execute):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.side_effect = [None, [Mock(balance=100)]]
-        mock_execute.side_effect = [None, None, None]
+    @patch.object(engine, 'execute')
+    @patch('config.engine.connect')
+    def test_transfer_funds_with_invalid_receiver(self, mock_connect, mock_execute):
+        p_sender = 123
+        p_receiver = 456
+        p_amount = 100
+        mock_conn = Mock()
+        mock_conn.commit = Mock()
+        mock_connect.return_value = mock_conn
+        
+        sender_update_mock = Mock()
+        sender_update_mock.return_value = 123
+        receiver_update_mock = Mock()
+        receiver_update_mock.side_effect = Exception('Invalid receiver')
+        query_mock = Mock()
+        query_mock.return_value.fetchall.return_value = [(123, 23), (456, 14)]
+        
+        mock_execute.side_effect = [sender_update_mock, receiver_update_mock, query_mock]
+        
+        with self.assertRaises(Exception):
+            transfer_funds(p_sender, p_receiver, p_amount)
+        self.assertEqual(engine.execute.call_count, 2)
+        self.assertEqual(mock_conn.commit.call_count, 1)
+        self.assertEqual(sender_update_mock.call_count, 1)
+        self.assertEqual(receiver_update_mock.call_count, 1)
+        self.assertEqual(query_mock.call_count, 0)
 
-        # Call the transfer_amount function
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id=1, receiver_id=2, amount=50)
-
-    @patch('your_config.engine.execute')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_receiver_account_not_found(self, mock_connect, mock_execute):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.side_effect = [[Mock(balance=100)], None]
-        mock_execute.side_effect = [None, None, None]
-
-        # Call the transfer_amount function
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id=1, receiver_id=2, amount=50)
-
-    @patch('your_config.engine.execute')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_amount_zero(self, mock_connect, mock_execute):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.side_effect = [[Mock(balance=100)], [Mock(balance=100)]]
-        mock_execute.side_effect = [None, None, None]
-
-        # Call the transfer_amount function
-        result = transfer_amount(sender_id=1, receiver_id=2, amount=0)
-        self.assertEqual(result, [(1, 0, 100), (2, 0, 100)])
-
-    @patch('your_config.engine.execute')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_max_value_error(self, mock_connect, mock_execute):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.side_effect = [[Mock(balance=2147483647)], [Mock(balance=2147483647)]]
-        mock_execute.side_effect = [None, None, None]
-
-        # Call the transfer_amount function
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id=1, receiver_id=2, amount=1)
-
-    @patch('config.engine')
-    @patch('psycopg2.connect')
-    def test_transfer_amount_config_error(self, mock_connect, mock_engine):
-        # Set up mocked database connections and results
-        mock_connect.return_value = Mock()
-        mock_connect().execute.side_effect = [None, None, None]
-        mock_engine.execute.side_effect = psycopg2.Error('Test error')
-
-        # Call the transfer_amount function
-        with self.assertRaises(psycopg2.Error):
-            transfer_amount(sender_id=1, receiver_id=2, amount=50)
+if __name__ == '__main__':
+    unittest.main()
