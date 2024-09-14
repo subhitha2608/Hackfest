@@ -5,9 +5,7 @@ import pandas as pd
 import psycopg2
 
 def generate_repayment_schedule(loan_id):
-    # Create a connection object
     conn = engine.connect()
-
     try:
         # Get loan details
         query = text("""
@@ -15,10 +13,12 @@ def generate_repayment_schedule(loan_id):
             FROM loans
             WHERE loanid = :loan_id
         """)
-        result = conn.execute(query, {'loan_id': loan_id})
-        loan_details = result.fetchone()
-
-        loan_amount, interest_rate, loan_term, start_date = loan_details
+        result = conn.execute(query, {"loan_id": loan_id})
+        row = result.fetchone()
+        if row:
+            loan_amount, interest_rate, loan_term, start_date = row
+        else:
+            return None
 
         # Convert annual interest rate to monthly interest rate (divide by 12)
         monthly_interest_rate = interest_rate / 100 / 12
@@ -32,7 +32,7 @@ def generate_repayment_schedule(loan_id):
         # Initialize payment_date to the start date of the loan
         payment_date = start_date
 
-        # Initialize payment number to 1
+        # Initialize payment_number
         payment_number = 1
 
         # Loop through each month and calculate the repayment schedule
@@ -52,28 +52,35 @@ def generate_repayment_schedule(loan_id):
                 VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
             """)
             conn.execute(query, {
-                'loan_id': loan_id,
-                'payment_number': payment_number,
-                'payment_date': payment_date,
-                'principal_amount': principal_amount,
-                'interest_amount': interest_amount,
-                'monthly_payment': monthly_payment,
-                'balance': balance
+                "loan_id": loan_id,
+                "payment_number": payment_number,
+                "payment_date": payment_date,
+                "principal_amount": principal_amount,
+                "interest_amount": interest_amount,
+                "monthly_payment": monthly_payment,
+                "balance": balance
             })
 
             # Move to the next month
-            payment_date += pd.Timedelta('1 month')
+            payment_date += pd.Timedelta(days=30)
             payment_number += 1
 
         # Commit changes
         conn.commit()
 
-    except psycopg2.Error as e:
-        # Rollback changes on error
-        conn.rollback()
-        raise e
-    finally:
-        # Close the connection
-        conn.close()
+        # Return the repayment schedule
+        query = text("""
+            SELECT *
+            FROM repaymentschedule
+            WHERE loanid = :loan_id
+            ORDER BY paymentnumber
+        """)
+        result = conn.execute(query, {"loan_id": loan_id})
+        repayment_schedule = pd.DataFrame(result.fetchall(), columns=[desc[0] for desc in result.cursor.description])
+        return repayment_schedule
 
-    return "Repayment schedule generated successfully"
+    except psycopg2.Error as e:
+        print(f"An error occurred: {e}")
+        return None
+    finally:
+        conn.close()
