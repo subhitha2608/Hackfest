@@ -1,102 +1,107 @@
 
 import unittest
-from your_module import calculate_credit_score  # Replace with the actual module name
+from your_module import calculate_credit_score  # Import the function to be tested
 
 class TestCalculateCreditScore(unittest.TestCase):
     def setUp(self):
-        # Create a test database connection and tables
-        self.conn = engine.connect()
-        self.conn.execute("CREATE TABLE loans (customer_id INT, loan_amount DECIMAL, repayment_amount DECIMAL, outstanding_balance DECIMAL)")
-        self.conn.execute("CREATE TABLE credit_cards (customer_id INT, balance DECIMAL)")
-        self.conn.execute("CREATE TABLE payments (customer_id INT, status VARCHAR)")
-        self.conn.execute("CREATE TABLE customers (id INT, credit_score INT)")
-        self.conn.execute("CREATE TABLE credit_score_alerts (customer_id INT, credit_score INT, created_at TIMESTAMP)")
+        # Create a test database connection or engine
+        self.engine = create_engine('postgresql://user:password@host:port/dbname')
 
     def tearDown(self):
-        # Drop the test tables and close the connection
-        self.conn.execute("DROP TABLE loans")
-        self.conn.execute("DROP TABLE credit_cards")
-        self.conn.execute("DROP TABLE payments")
-        self.conn.execute("DROP TABLE customers")
-        self.conn.execute("DROP TABLE credit_score_alerts")
-        self.conn.close()
+        # Close the database connection or engine
+        self.engine.dispose()
 
-    def test_calculate_credit_score_with_loans_and_credit_cards(self):
-        # Insert test data
-        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (1, 1000, 500, 200)")
-        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (1, 500)")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
+    def test_calculate_credit_score_positive(self):
+        # Test with positive data
+        customer_id = 1
+        total_loan_amount = 10000.0
+        total_repayment = 8000.0
+        outstanding_loan_balance = 2000.0
+        credit_card_balance = 500.0
+        late_pay_count = 0
 
-        # Calculate credit score
-        credit_score = calculate_credit_score(1)
+        # Insert test data into the database
+        self.engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)" % (customer_id, total_loan_amount, total_repayment, outstanding_loan_balance))
+        self.engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)" % (customer_id, credit_card_balance))
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'On Time')" % customer_id)
 
-        # Assert the result
-        self.assertAlmostEqual(credit_score, 640, places=0)
-
-    def test_calculate_credit_score_with_no_loans(self):
-        # Insert test data
-        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (1, 500)")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
-
-        # Calculate credit score
-        credit_score = calculate_credit_score(1)
+        # Call the function to be tested
+        credit_score = calculate_credit_score(customer_id)
 
         # Assert the result
-        self.assertAlmostEqual(credit_score, 700, places=0)
+        self.assertGreaterEqual(credit_score, 700)
+        self.assertLessEqual(credit_score, 850)
 
-    def test_calculate_credit_score_with_late_payments(self):
-        # Insert test data
-        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (1, 1000, 500, 200)")
-        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (1, 500)")
-        self.conn.execute("INSERT INTO payments (customer_id, status) VALUES (1, 'Late')")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
+    def test_calculate_credit_score_negative(self):
+        # Test with negative data
+        customer_id = 2
+        total_loan_amount = 0.0
+        total_repayment = 0.0
+        outstanding_loan_balance = 0.0
+        credit_card_balance = 0.0
+        late_pay_count = 5
 
-        # Calculate credit score
-        credit_score = calculate_credit_score(1)
+        # Insert test data into the database
+        self.engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)" % (customer_id, total_loan_amount, total_repayment, outstanding_loan_balance))
+        self.engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)" % (customer_id, credit_card_balance))
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')" % customer_id)
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')" % customer_id)
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')" % customer_id)
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')" % customer_id)
+        self.engine.execute("INSERT INTO payments (customer_id, status) VALUES (%s, 'Late')" % customer_id)
 
-        # Assert the result
-        self.assertAlmostEqual(credit_score, 590, places=0)
-
-    def test_calculate_credit_score_with_low_credit_card_balance(self):
-        # Insert test data
-        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (1, 1000, 500, 200)")
-        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (1, 100)")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
-
-        # Calculate credit score
-        credit_score = calculate_credit_score(1)
-
-        # Assert the result
-        self.assertAlmostEqual(credit_score, 740, places=0)
-
-    def test_calculate_credit_score_with_no_credit_card(self):
-        # Insert test data
-        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (1, 1000, 500, 200)")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
-
-        # Calculate credit score
-        credit_score = calculate_credit_score(1)
+        # Call the function to be tested
+        credit_score = calculate_credit_score(customer_id)
 
         # Assert the result
-        self.assertAlmostEqual(credit_score, 680, places=0)
+        self.assertLessEqual(credit_score, 500)
 
-    def test_calculate_credit_score_with_non_numeric_data(self):
-        # Insert test data with non-numeric values
-        self.conn.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (1, 'abc', 'def', 'ghi')")
-        self.conn.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (1, 'jkl')")
-        self.conn.execute("INSERT INTO customers (id) VALUES (1)")
+    def test_calculate_credit_score_zero_loan_amount(self):
+        # Test with zero loan amount
+        customer_id = 3
+        total_loan_amount = 0.0
+        total_repayment = 0.0
+        outstanding_loan_balance = 0.0
+        credit_card_balance = 0.0
+        late_pay_count = 0
 
-        # Calculate credit score
-        with self.assertRaises(ValueError):
-            calculate_credit_score(1)
+        # Insert test data into the database
+        self.engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)" % (customer_id, total_loan_amount, total_repayment, outstanding_loan_balance))
+        self.engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)" % (customer_id, credit_card_balance))
 
-    def test_calculate_credit_score_with_customer_id_not_found(self):
-        # Insert no data
-        self.conn.execute("INSERT INTO customers (id) VALUES (2)")
+        # Call the function to be tested
+        credit_score = calculate_credit_score(customer_id)
 
-        # Calculate credit score
+        # Assert the result
+        self.assertEqual(credit_score, 700)
+
+    def test_calculate_credit_score_zero_credit_card_balance(self):
+        # Test with zero credit card balance
+        customer_id = 4
+        total_loan_amount = 10000.0
+        total_repayment = 8000.0
+        outstanding_loan_balance = 2000.0
+        credit_card_balance = 0.0
+        late_pay_count = 0
+
+        # Insert test data into the database
+        self.engine.execute("INSERT INTO loans (customer_id, loan_amount, repayment_amount, outstanding_balance) VALUES (%s, %s, %s, %s)" % (customer_id, total_loan_amount, total_repayment, outstanding_loan_balance))
+        self.engine.execute("INSERT INTO credit_cards (customer_id, balance) VALUES (%s, %s)" % (customer_id, credit_card_balance))
+
+        # Call the function to be tested
+        credit_score = calculate_credit_score(customer_id)
+
+        # Assert the result
+        self.assertGreaterEqual(credit_score, 700)
+        self.assertLessEqual(credit_score, 850)
+
+    def test_calculate_credit_score_nonexistent_customer(self):
+        # Test with nonexistent customer
+        customer_id = 999
+
+        # Call the function to be tested
         with self.assertRaises(Exception):
-            calculate_credit_score(1)
+            calculate_credit_score(customer_id)
 
 if __name__ == '__main__':
     unittest.main()

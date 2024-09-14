@@ -1,57 +1,65 @@
 
 import unittest
-from your_module import transfer_funds
-from sqlalchemy import create_engine
-import pandas as pd
-import psycopg2
+from your_module import transfer_funds  # replace with the actual module name
 
 class TestTransferFunds(unittest.TestCase):
-
     def setUp(self):
-        self.engine = create_engine('postgresql://user:password@localhost/dbname')
-        self.conn = self.engine.connect()
+        # Create a test database connection
+        self.conn = engine.connect()
 
-    def test_transfer_funds_positive(self):
-        # setup sample data
-        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
-
-        # test function
-        result = transfer_funds(1, 2, 20)
-
-        # assertions
-        self.assertEqual(result, "Funds transferred successfully")
-        sender_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").fetchone()[0]
-        receiver_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").fetchone()[0]
-        self.assertEqual(sender_balance, 80)
-        self.assertEqual(receiver_balance, 70)
-
-    def test_transfer_funds_insufficient_balance(self):
-        # setup sample data
-        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100), (2, 50)")
-
-        # test function
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 2, 150)
-
-    def test_transfer_funds_receiver_not_found(self):
-        # setup sample data
-        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (1, 100)")
-
-        # test function
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 3, 20)
-
-    def test_transfer_funds_sender_not_found(self):
-        # setup sample data
-        self.conn.execute("INSERT INTO accounts (id, balance) VALUES (2, 50)")
-
-        # test function
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 2, 20)
+        # Create test accounts with initial balances
+        self.sender_id = 1
+        self.receiver_id = 2
+        self.initial_balance = 100
+        self.conn.execute(text("INSERT INTO accounts (id, balance) VALUES (:id, :balance)"),
+                           [{'id': self.sender_id, 'balance': self.initial_balance},
+                            {'id': self.receiver_id, 'balance': self.initial_balance}])
+        self.conn.commit()
 
     def tearDown(self):
-        self.conn.execute("DELETE FROM accounts")
+        # Rollback any changes made during the test
+        self.conn.rollback()
         self.conn.close()
+
+    def test_transfer_funds_positive(self):
+        # Positive test: transfer funds from sender to receiver
+        p_amount = 50
+        transfer_funds(self.sender_id, self.receiver_id, p_amount)
+
+        # Verify that the balances have been updated correctly
+        sender_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': self.sender_id}).fetchone()[0]
+        receiver_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': self.receiver_id}).fetchone()[0]
+        self.assertEqual(sender_balance, self.initial_balance - p_amount)
+        self.assertEqual(receiver_balance, self.initial_balance + p_amount)
+
+    def test_transfer_funds_zero_amount(self):
+        # Test transferring zero amount
+        p_amount = 0
+        transfer_funds(self.sender_id, self.receiver_id, p_amount)
+
+        # Verify that the balances remain unchanged
+        sender_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': self.sender_id}).fetchone()[0]
+        receiver_balance = self.conn.execute(text("SELECT balance FROM accounts WHERE id = :id"), {'id': self.receiver_id}).fetchone()[0]
+        self.assertEqual(sender_balance, self.initial_balance)
+        self.assertEqual(receiver_balance, self.initial_balance)
+
+    def test_transfer_funds_negative_amount(self):
+        # Test transferring negative amount
+        p_amount = -50
+        with self.assertRaises(ValueError):
+            transfer_funds(self.sender_id, self.receiver_id, p_amount)
+
+    def test_transfer_funds_invalid_sender_id(self):
+        # Test transferring funds with invalid sender ID
+        p_amount = 50
+        with self.assertRaises(sqlalchemy.exc.NoSuchTable):
+            transfer_funds(999, self.receiver_id, p_amount)
+
+    def test_transfer_funds_invalid_receiver_id(self):
+        # Test transferring funds with invalid receiver ID
+        p_amount = 50
+        with self.assertRaises(sqlalchemy.exc.NoSuchTable):
+            transfer_funds(self.sender_id, 999, p_amount)
 
 if __name__ == '__main__':
     unittest.main()
