@@ -1,22 +1,20 @@
 
 from config import engine
-from sqlalchemy import text
 import pandas as pd
-import psycopg2
+from sqlalchemy import text
 
 def calculate_credit_score(customer_id):
     conn = engine.connect()
 
     # Step 1: Calculate the customer's total loan amount, total repayment, and outstanding balance
     query = text("""
-        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), 
-               COALESCE(ROUND(SUM(repayment_amount), 2), 0), 
-               COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
+        SELECT COALESCE(ROUND(SUM(loan_amount), 2), 0), COALESCE(ROUND(SUM(repayment_amount), 2), 0), COALESCE(ROUND(SUM(outstanding_balance), 2), 0)
         FROM loans
         WHERE loans.customer_id = :customer_id
     """)
     result = conn.execute(query, {"customer_id": customer_id})
-    total_loan_amount, total_repayment, outstanding_loan_balance = result.fetchone()
+    row = result.fetchone()
+    total_loan_amount, total_repayment, outstanding_loan_balance = row
 
     # Step 2: Get the current credit card balance
     query = text("""
@@ -51,10 +49,7 @@ def calculate_credit_score(customer_id):
     credit_score -= late_pay_count * 50  # Deduct 50 points for each late payment
 
     # Ensure the score stays within reasonable bounds (e.g., 300 to 850)
-    if credit_score < 300:
-        credit_score = 300
-    elif credit_score > 850:
-        credit_score = 850
+    credit_score = max(300, min(850, credit_score))
 
     # Update the customer's credit score
     query = text("""

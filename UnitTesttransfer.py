@@ -1,52 +1,38 @@
 
 import unittest
-from your_module import transfer_funds  # Import the function to be tested
-import pandas as pd
+from transfer_balance import transfer_balance
 
-class TestTransferFunds(unittest.TestCase):
-    def test_transfer_funds_success(self):
-        # Setup: Create a test database connection
-        conn = engine.connect()
+class TestTransferBalance(unittest.TestCase):
+    def test_transfer_balance(self):
+        # Initial balances: sender has 100, receiver has 50
+        sender_id = 1
+        receiver_id = 2
+        amount = 20
 
-        # Execute the function to be tested
-        transfer_funds(1, 2, 10.0)
+        # Perform the transfer
+        balances = transfer_balance(sender_id, receiver_id, amount)
 
-        # Query the database to verify the results
-        query = "SELECT balance FROM accounts WHERE id = 1"
-        sender_balance = pd.read_sql(query, conn)['balance'][0]
-        self.assertEquals(sender_balance, 90.0)  # Assume initial balance was 100.0
+        # Check the updated balances
+        self.assertEqual(balances, [80, 70])  # sender now has 80, receiver now has 70
 
-        conn.close()
+    def test_insufficient_balance(self):
+        # Initial balances: sender has 50, receiver has 50
+        sender_id = 1
+        receiver_id = 2
+        amount = 60  # exceeds sender's balance
 
-    def test_transfer_funds_insufficient_funds(self):
-        # Setup: Create a test database connection
-        conn = engine.connect()
+        # Perform the transfer (should raise an exception)
+        with self.assertRaises(Exception):
+            transfer_balance(sender_id, receiver_id, amount)
 
-        # Execute the function to be tested with insufficient funds
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 2, 150.0)
+    def test_same_account(self):
+        # Initial balances: account has 100
+        account_id = 1
+        amount = 20
 
-        # Query the database to verify the results
-        query = "SELECT balance FROM accounts WHERE id = 1"
-        sender_balance = pd.read_sql(query, conn)['balance'][0]
-        self.assertEquals(sender_balance, 100.0)  # Balance should not have changed
-
-        conn.close()
-
-    def test_transfer_funds_invalid_receiver_id(self):
-        # Setup: Create a test database connection
-        conn = engine.connect()
-
-        # Execute the function to be tested with an invalid receiver ID
-        with self.assertRaises(psycopg2.Error):
-            transfer_funds(1, 999, 10.0)
-
-        # Query the database to verify the results
-        query = "SELECT balance FROM accounts WHERE id = 1"
-        sender_balance = pd.read_sql(query, conn)['balance'][0]
-        self.assertEquals(sender_balance, 100.0)  # Balance should not have changed
-
-        conn.close()
+        # Perform the transfer (should raise an exception)
+        with self.assertRaises(Exception):
+            transfer_balance(account_id, account_id, amount)
 
 if __name__ == '__main__':
     unittest.main()

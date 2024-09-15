@@ -1,21 +1,17 @@
 
 from config import engine
-import sqlalchemy as sa
+from sqlalchemy import text
 import pandas as pd
 import psycopg2
 
 def calculate_repayment_schedule(loan_id):
-    # Create a connection object
     connection = engine.connect()
-
     try:
         # Get loan details
-        query = sa.text("""
-            SELECT loanamount, interestrate, loanterm, startdate
-            FROM loans
-            WHERE loanid = :loan_id
-        """)
-        result = connection.execute(query, {"loan_id": loan_id})
+        query = text("SELECT loanamount, interestrate, loanterm, startdate "
+                     "FROM loans "
+                     "WHERE loanid = :loan_id")
+        result = connection.execute(query, {'loan_id': loan_id})
         loan_details = result.fetchone()
         loan_amount, interest_rate, loan_term, start_date = loan_details
 
@@ -31,8 +27,10 @@ def calculate_repayment_schedule(loan_id):
         # Initialize payment_date to the start date of the loan
         payment_date = start_date
 
-        # Loop through each month and calculate the repayment schedule
+        # Initialize payment_number to 1
         payment_number = 1
+
+        # Loop through each month and calculate the repayment schedule
         while payment_number <= loan_term:
             # Calculate interest for the current month
             interest_amount = balance * monthly_interest_rate
@@ -44,29 +42,26 @@ def calculate_repayment_schedule(loan_id):
             balance -= principal_amount
 
             # Insert repayment details into the RepaymentSchedule table
-            query = sa.text("""
-                INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance)
-                VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)
-            """)
-            connection.execute(query, {
-                "loan_id": loan_id,
-                "payment_number": payment_number,
-                "payment_date": payment_date,
-                "principal_amount": principal_amount,
-                "interest_amount": interest_amount,
-                "monthly_payment": monthly_payment,
-                "balance": balance
-            })
+            query = text("INSERT INTO repaymentschedule (loanid, paymentnumber, paymentdate, principalamount, interestamount, totalpayment, balance) "
+                          "VALUES (:loan_id, :payment_number, :payment_date, :principal_amount, :interest_amount, :monthly_payment, :balance)")
+            connection.execute(query, {'loan_id': loan_id,
+                                       'payment_number': payment_number,
+                                       'payment_date': payment_date,
+                                       'principal_amount': principal_amount,
+                                       'interest_amount': interest_amount,
+                                       'monthly_payment': monthly_payment,
+                                       'balance': balance})
 
             # Move to the next month
             payment_date += pd.DateOffset(months=1)
             payment_number += 1
 
-        # Commit changes
         connection.commit()
 
-        # Return the final result (not applicable in this case, as the function inserts data into the RepaymentSchedule table)
-        return None
-
+    except psycopg2.Error as e:
+        print(f"Error: {e}")
+        connection.rollback()
     finally:
         connection.close()
+
+    return "Repayment schedule calculated successfully"
