@@ -1,38 +1,30 @@
 
 import unittest
-from transfer_balance import transfer_balance
+from your_module import transfer_amount  # replace with the actual module name
 
-class TestTransferBalance(unittest.TestCase):
-    def test_transfer_balance(self):
-        # Initial balances: sender has 100, receiver has 50
-        sender_id = 1
-        receiver_id = 2
-        amount = 20
+class TestTransferAmount(unittest.TestCase):
+    def setUp(self):
+        self.conn = engine.connect()
 
-        # Perform the transfer
-        balances = transfer_balance(sender_id, receiver_id, amount)
+    def tearDown(self):
+        self.conn.close()
 
-        # Check the updated balances
-        self.assertEqual(balances, [80, 70])  # sender now has 80, receiver now has 70
+    def test_transfer_amount_success(self):
+        initial_sender_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").scalar()
+        initial_receiver_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").scalar()
+        transfer_amount(1, 2, 10)
+        updated_sender_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").scalar()
+        updated_receiver_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").scalar()
+        self.assertEquals(updated_sender_balance, initial_sender_balance - 10)
+        self.assertEquals(updated_receiver_balance, initial_receiver_balance + 10)
 
-    def test_insufficient_balance(self):
-        # Initial balances: sender has 50, receiver has 50
-        sender_id = 1
-        receiver_id = 2
-        amount = 60  # exceeds sender's balance
-
-        # Perform the transfer (should raise an exception)
+    def test_transfer_amount_insufficient_funds(self):
         with self.assertRaises(Exception):
-            transfer_balance(sender_id, receiver_id, amount)
+            transfer_amount(1, 2, 1000)  # assume sender's balance is less than 1000
 
-    def test_same_account(self):
-        # Initial balances: account has 100
-        account_id = 1
-        amount = 20
-
-        # Perform the transfer (should raise an exception)
+    def test_transfer_amount_invalid_receiver(self):
         with self.assertRaises(Exception):
-            transfer_balance(account_id, account_id, amount)
+            transfer_amount(1, 999, 10)  # assume receiver with id 999 does not exist
 
 if __name__ == '__main__':
     unittest.main()
