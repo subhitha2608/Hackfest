@@ -1,30 +1,26 @@
 
 import unittest
-from your_module import transfer_amount  # replace with the actual module name
+from your_module import transfer_amount  # Replace with the actual module name
 
 class TestTransferAmount(unittest.TestCase):
-    def setUp(self):
-        self.conn = engine.connect()
-
-    def tearDown(self):
-        self.conn.close()
-
     def test_transfer_amount_success(self):
-        initial_sender_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").scalar()
-        initial_receiver_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").scalar()
-        transfer_amount(1, 2, 10)
-        updated_sender_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 1").scalar()
-        updated_receiver_balance = self.conn.execute("SELECT balance FROM accounts WHERE id = 2").scalar()
-        self.assertEquals(updated_sender_balance, initial_sender_balance - 10)
-        self.assertEquals(updated_receiver_balance, initial_receiver_balance + 10)
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 10
+        balances = transfer_amount(p_sender, p_receiver, p_amount)
+        self.assertEquals(balances[0]['balance'], 90)  # Assuming sender's initial balance is 100
+        self.assertEquals(balances[1]['balance'], 110)  # Assuming receiver's initial balance is 100
 
     def test_transfer_amount_insufficient_funds(self):
-        with self.assertRaises(Exception):
-            transfer_amount(1, 2, 1000)  # assume sender's balance is less than 1000
+        p_sender = 1
+        p_receiver = 2
+        p_amount = 150  # More than sender's balance
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(p_sender, p_receiver, p_amount)
 
-    def test_transfer_amount_invalid_receiver(self):
-        with self.assertRaises(Exception):
-            transfer_amount(1, 999, 10)  # assume receiver with id 999 does not exist
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_transfer_amount_invalid_account(self):
+        p_sender = 1
+        p_receiver = 999  # Non-existent account
+        p_amount = 10
+        with self.assertRaises(psycopg2.Error):
+            transfer_amount(p_sender, p_receiver, p_amount)

@@ -1,22 +1,19 @@
 
 import unittest
-from your_module import calculate_credit_score  # Replace with the actual module name
+from your_module import calculate_credit_score  # replace with the actual module name
 
 class TestCalculateCreditScore(unittest.TestCase):
-    def test_calculate_credit_score_happy_path(self):
-        customer_id = 123  # Replace with a valid customer ID
+    def test_calculate_credit_score(self):
+        customer_id = 123  # assume this customer has some loans, credit cards, and payments in the database
         credit_score = calculate_credit_score(customer_id)
-        self.assertEquals(credit_score, 650)  # Replace with the expected credit score
+        self.assertEquals(credit_score, 650)  # replace with the expected credit score for this customer
 
     def test_calculate_credit_score_no_loans(self):
-        customer_id = 456  # Replace with a customer ID with no loans
+        customer_id = 456  # assume this customer has no loans, but has credit cards and payments
         credit_score = calculate_credit_score(customer_id)
-        self.assertEquals(credit_score, 700)  # Replace with the expected credit score
+        self.assertEquals(credit_score, 700)  # replace with the expected credit score for this customer
 
     def test_calculate_credit_score_late_payments(self):
-        customer_id = 789  # Replace with a customer ID with late payments
+        customer_id = 789  # assume this customer has some loans, credit cards, and late payments
         credit_score = calculate_credit_score(customer_id)
-        self.assertEquals(credit_score, 400)  # Replace with the expected credit score
-
-if __name__ == '__main__':
-    unittest.main()
+        self.assertEquals(credit_score, 550)  # replace with the expected credit score for this customer
